@@ -19,17 +19,28 @@ fn main() {
     let mut follow_joystick = FollowJoystick::new();
     let mut i2c_device = LinuxI2CDevice::new("/dev/i2c-1", 0x60).unwrap();
 
+    i2c_device.write(&[0x00, 0x00]).unwrap();
+    i2c_device.write(&[0x26, 0x00]).unwrap();
+    i2c_device.write(&[0x27, 0x10]).unwrap();
+    i2c_device.write(&[0x28, 0x00]).unwrap();
+    i2c_device.write(&[0x29, 0x00]).unwrap();
+
+    i2c_device.write(&[0x2A, 0x00]).unwrap();
+    i2c_device.write(&[0x2B, 0x00]).unwrap();
+    i2c_device.write(&[0x2C, 0x00]).unwrap();
+    i2c_device.write(&[0x2D, 0x10]).unwrap();
+
+    i2c_device.write(&[0x2E, 0x00]).unwrap();
+    i2c_device.write(&[0x2F, 0x10]).unwrap();
+    i2c_device.write(&[0x30, 0x00]).unwrap();
+    i2c_device.write(&[0x31, 0x00]).unwrap();
+
     for _ in GameLoop::from_fps(10) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
         let action = follow_joystick.decide(user_input);
 
         /*let result = perform_action(action, &mut adafruit_dc_controller);
         println!("{:?}", result);*/
-
-        i2c_device.write(&[0x00, 0x00]).unwrap();
-        i2c_device.write(&[0x26, 0x00, 0x10, 0x00, 0x00]).unwrap();
-        i2c_device.write(&[0x2A, 0x00, 0x00, 0x00, 0x10]).unwrap();
-        i2c_device.write(&[0x2E, 0x00, 0x10, 0x00, 0x00]).unwrap();
     }
 }
 
