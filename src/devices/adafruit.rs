@@ -34,8 +34,8 @@ impl MotorController<LinuxI2CError> for AdafruitDCStepperHat {
             pwm_reg,
             0x00,
             0x00,
-            speed.to_be_bytes()[0],
-            speed.to_be_bytes()[1],
+            speed.to_le_bytes()[0],
+            speed.to_le_bytes()[1],
         ];
 
         self.i2c_device.write(&pwm_data)
