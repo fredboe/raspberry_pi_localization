@@ -2,6 +2,8 @@ use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::robot::perform_action;
 use crate::user_input::{UserInput, UserInputUnit};
+use i2cdev::core::I2CDevice;
+use i2cdev::linux::LinuxI2CDevice;
 use std::time::{Duration, Instant};
 
 mod deciders;
@@ -15,12 +17,19 @@ fn main() {
     let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60).expect("i2c error"); // addr probably wrong
     let mut user_input_unit = UserInputUnit::new();
     let mut follow_joystick = FollowJoystick::new();
+    let mut i2c_device = LinuxI2CDevice::new("/dev/i2c-1", 0x60)?;
 
     for _ in GameLoop::from_fps(10) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
         let action = follow_joystick.decide(user_input);
 
-        perform_action(action, &mut adafruit_dc_controller).unwrap_or(()); // later just log the error
+        /*let result = perform_action(action, &mut adafruit_dc_controller);
+        println!("{:?}", result);*/
+
+        i2c_device.write(&[0x00, 0x00])?;
+        i2c_device.write(&[0x2E, 0x00, 0x00, 0xFF, 0x0F])?;
+        i2c_device.write(&[0x2A, 0x00, 0x00, 0x00, 0x00])?;
+        i2c_device.write(&[0x26, 0x00, 0x00, 0xFF, 0x0F])?;
     }
 }
 

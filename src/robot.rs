@@ -15,7 +15,7 @@ pub trait MotorController<ERR: Error> {
 pub enum Directions {
     FORWARD,
     BACKWARD,
-    BREAK
+    BREAK,
 }
 
 impl From<f32> for Directions {
@@ -31,17 +31,20 @@ impl From<f32> for Directions {
 #[derive(Debug)]
 pub enum Action {
     Idle,
-    Drive(f32, f32)
+    Drive(f32, f32),
 }
 
-pub fn perform_action<ERR: Error, M: MotorController<ERR>>(action: Action, motor_controller: &mut M) -> Result<(), ERR> {
-    println!("Perform the action {:?}", action);
+pub fn perform_action<ERR: Error, M: MotorController<ERR>>(
+    action: Action,
+    motor_controller: &mut M,
+) -> Result<(), ERR> {
+    // println!("Perform the action {:?}", action);
 
     match action {
         Action::Idle => {
             motor_controller.run(0, Directions::BREAK, 0.0)?;
             motor_controller.run(1, Directions::BREAK, 0.0)
-        },
+        }
         Action::Drive(motor_left, motor_right) => {
             let direction_left = Directions::from(motor_left);
             let speed_left = motor_left.abs();
@@ -54,5 +57,3 @@ pub fn perform_action<ERR: Error, M: MotorController<ERR>>(action: Action, motor
         }
     }
 }
-
-
