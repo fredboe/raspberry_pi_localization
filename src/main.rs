@@ -17,7 +17,7 @@ fn main() {
     let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60).expect("i2c error"); // addr probably wrong
     let mut user_input_unit = UserInputUnit::new();
     let mut follow_joystick = FollowJoystick::new();
-    let mut i2c_device = LinuxI2CDevice::new("/dev/i2c-1", 0x60)?;
+    let mut i2c_device = LinuxI2CDevice::new("/dev/i2c-1", 0x60).unwrap();
 
     for _ in GameLoop::from_fps(10) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
