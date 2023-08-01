@@ -36,6 +36,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17febce684fd15d89027105661fec94afb475cb995fbc59d2865198446ba2eea"
 
 [[package]]
+name = "byteorder"
+version = "1.4.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
+
+[[package]]
+name = "cc"
+version = "1.0.79"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "50d30906286121d95be3d479533b458f87493b30a4b5f79a607db8f5d11aa91f"
+
+[[package]]
 name = "cfg-if"
 version = "1.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -88,12 +100,24 @@ dependencies = [
  "libc",
  "libudev-sys",
  "log",
- "nix",
+ "nix 0.26.2",
  "uuid",
  "vec_map",
  "wasm-bindgen",
  "web-sys",
  "windows",
+]
+
+[[package]]
+name = "i2cdev"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b8fe61341e9ce588ede54fd131bf0df63eed3c6e45fcc7fa0e548ea176f39358"
+dependencies = [
+ "bitflags",
+ "byteorder",
+ "libc",
+ "nix 0.23.2",
 ]
 
 [[package]]
@@ -157,6 +181,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "memoffset"
+version = "0.6.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5aa361d4faea93603064a027415f07bd8e1d5c88c9fbf68bf56a285428fd79ce"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "nalgebra"
 version = "0.32.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -181,6 +214,19 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "nix"
+version = "0.23.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8f3790c00a0150112de0f4cd161e3d7fc4b2d8a5542ffc35f099a2562aecb35c"
+dependencies = [
+ "bitflags",
+ "cc",
+ "cfg-if",
+ "libc",
+ "memoffset",
 ]
 
 [[package]]
@@ -275,6 +321,7 @@ name = "raspberry_pi_localization"
 version = "0.1.0"
 dependencies = [
  "gilrs",
+ "i2cdev",
  "nalgebra",
 ]
 

@@ -1,15 +1,18 @@
-use std::time::{Instant, Duration};
 use crate::deciders::{Decider, FollowJoystick};
+use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::robot::perform_action;
 use crate::user_input::{UserInput, UserInputUnit};
+use std::time::{Duration, Instant};
 
-mod state;
-mod sensor;
-mod user_input;
-mod robot;
 mod deciders;
+mod devices;
+mod robot;
+mod sensor;
+mod state;
+mod user_input;
 
 fn main() {
+    let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60).expect("i2c error"); // addr probably wrong
     let mut user_input_unit = UserInputUnit::new();
     let mut follow_joystick = FollowJoystick::new();
 
@@ -17,20 +20,22 @@ fn main() {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
         let action = follow_joystick.decide(user_input);
 
-        perform_action(action);
+        perform_action(action, &mut adafruit_dc_controller).unwrap_or(()); // later just log the error
     }
 }
 
-
 struct GameLoop {
     current_frame_start: Instant,
-    duration_per_frame: Duration
+    duration_per_frame: Duration,
 }
 
 impl GameLoop {
     fn new(duration_per_frame: Duration) -> GameLoop {
         let current_frame_start = Instant::now();
-        GameLoop { current_frame_start, duration_per_frame }
+        GameLoop {
+            current_frame_start,
+            duration_per_frame,
+        }
     }
 
     fn from_fps(fps: u8) -> GameLoop {
