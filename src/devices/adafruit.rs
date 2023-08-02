@@ -59,11 +59,11 @@ impl MotorController<LinuxI2CError> for AdafruitDCStepperHat {
 
         // AIN1=HIGH, AIN2=LOW => FORWARD, AIN1=LOW, AIN2=HIGH => BACKWARD, _ => BRAKE
         let (ain1_pwm_id, ain2_pwm_id): (u8, u8) = match motor_id {
-            0 => (10, 9),  // For the first motor: AIN1=PWM10, AIN2=PWM9
+            0 => (9, 10),  // For the first motor: AIN1=PWM10, AIN2=PWM9
             1 => (11, 12), // For the scd motor: AIN1=PWM11, AIN2=PWM12
-            2 => (4, 3),
+            2 => (3, 4),
             3 => (5, 6),
-            _ => (10, 9),
+            _ => (9, 10),
         };
 
         let ain1_reg = Self::pwm_id_to_reg(ain1_pwm_id);
