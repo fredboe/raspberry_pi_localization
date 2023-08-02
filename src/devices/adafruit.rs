@@ -8,7 +8,8 @@ pub struct AdafruitDCStepperHat {
 
 impl AdafruitDCStepperHat {
     pub fn new(i2c_addr: u16) -> Result<AdafruitDCStepperHat, LinuxI2CError> {
-        let i2c_device = LinuxI2CDevice::new("/dev/i2c-1", i2c_addr)?;
+        let mut i2c_device = LinuxI2CDevice::new("/dev/i2c-1", i2c_addr)?;
+        i2c_device.write(&[0x00, 0x00])?;
         Ok(AdafruitDCStepperHat { i2c_device })
     }
 

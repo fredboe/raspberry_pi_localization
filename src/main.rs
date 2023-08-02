@@ -2,7 +2,7 @@ use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::robot::perform_action;
 use crate::user_input::{UserInput, UserInputUnit};
-use i2cdev::core::I2CDevice;
+use log::Level::Error;
 use std::time::{Duration, Instant};
 
 mod deciders;
@@ -24,7 +24,6 @@ fn main() {
         let action = follow_joystick.decide(user_input);
 
         let result = perform_action(action, &mut adafruit_dc_controller);
-        log::info!("Result after perform_action {:?}", result);
     }
 }
 
