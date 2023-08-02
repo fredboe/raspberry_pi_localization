@@ -24,7 +24,7 @@ fn main() {
         let action = follow_joystick.decide(user_input);
 
         let result = perform_action(action, &mut adafruit_dc_controller);
-        println!("{:?}", result);
+        log::info!("Result after perform_action {:?}", result);
     }
 }
 
