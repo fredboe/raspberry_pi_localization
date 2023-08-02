@@ -14,7 +14,7 @@ pub trait MotorController<ERR: Error> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Directions {
     FORWARD,
     BACKWARD,
@@ -22,6 +22,8 @@ pub enum Directions {
 }
 
 impl From<f32> for Directions {
+    /// # Explanation
+    /// If value >= 0 then FORWARD else BACKWARD
     fn from(value: f32) -> Self {
         if value >= 0.0 {
             Directions::FORWARD
@@ -53,10 +55,10 @@ pub fn perform_action<ERR: Error, M: MotorController<ERR>>(
         }
         Action::Drive(motor_left, motor_right) => {
             let direction_left = Directions::from(motor_left);
-            let speed_left = motor_left.abs();
+            let speed_left = motor_left.abs().min(1.0);
 
             let direction_right = Directions::from(motor_right);
-            let speed_right = motor_right.abs();
+            let speed_right = motor_right.abs().min(1.0);
 
             motor_controller.run(0, direction_left, speed_left)?;
             motor_controller.run(2, direction_right, speed_right)

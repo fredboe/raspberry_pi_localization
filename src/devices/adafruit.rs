@@ -19,6 +19,17 @@ impl AdafruitDCStepperHat {
         Ok(AdafruitDCStepperHat { i2c_device })
     }
 
+    /// # Explanation
+    /// This function writes a buffer to the i2c device starting with the given register.
+    ///
+    /// # Arguments
+    /// reg: This is the id of the reg to write the first byte at.
+    ///
+    /// data: This is a reference to the buffer.
+    ///
+    /// # Example
+    /// Lets say reg=1 and data=\[0x10, 0x20, 0x30\] then 0x10 is written to reg1, 0x20 is written to reg2
+    /// and 0x30 is written to reg3.
     fn i2c_write_to_reg_sequence(&mut self, reg: u8, data: &[u8]) -> Result<(), LinuxI2CError> {
         for (data, reg) in data.into_iter().zip(reg..) {
             self.i2c_device.write(&[reg, *data])?;
@@ -52,8 +63,8 @@ impl MotorController<LinuxI2CError> for AdafruitDCStepperHat {
     fn set_direction(&mut self, motor_id: u8, direction: Directions) -> Result<(), LinuxI2CError> {
         // AIN1=HIGH, AIN2=LOW => FORWARD, AIN1=LOW, AIN2=HIGH => BACKWARD, _ => BRAKE
         let (ain1_pwm_id, ain2_pwm_id): (u8, u8) = match motor_id {
-            0 => (9, 10),  // For the first motor: AIN1=PWM10, AIN2=PWM9
-            1 => (11, 12), // For the scd motor: AIN1=PWM11, AIN2=PWM12
+            0 => (9, 10),  // For motor1: AIN1=PWM9, AIN2=PWM10
+            1 => (11, 12), // For motor2: AIN1=PWM11, AIN2=PWM12
             2 => (3, 4),
             3 => (5, 6),
             _ => (9, 10),
