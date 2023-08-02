@@ -13,6 +13,8 @@ mod state;
 mod user_input;
 
 fn main() {
+    env_logger::init();
+
     let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60).expect("i2c error"); // addr probably wrong
     let mut user_input_unit = UserInputUnit::new();
     let mut follow_joystick = FollowJoystick::new();

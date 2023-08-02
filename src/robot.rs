@@ -38,12 +38,12 @@ pub fn perform_action<ERR: Error, M: MotorController<ERR>>(
     action: Action,
     motor_controller: &mut M,
 ) -> Result<(), ERR> {
-    println!("Perform the action {:?}", action);
+    log::info!("Robot: Perform the action {:?}", action);
 
     match action {
         Action::Idle => {
             motor_controller.run(0, Directions::BREAK, 0.0)?;
-            motor_controller.run(1, Directions::BREAK, 0.0)
+            motor_controller.run(2, Directions::BREAK, 0.0)
         }
         Action::Drive(motor_left, motor_right) => {
             let direction_left = Directions::from(motor_left);
@@ -53,7 +53,7 @@ pub fn perform_action<ERR: Error, M: MotorController<ERR>>(
             let speed_right = motor_right.abs();
 
             motor_controller.run(0, direction_left, speed_left)?;
-            motor_controller.run(1, direction_right, speed_right)
+            motor_controller.run(2, direction_right, speed_right)
         }
     }
 }

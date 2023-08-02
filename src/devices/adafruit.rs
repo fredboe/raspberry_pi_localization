@@ -14,6 +14,7 @@ impl AdafruitDCStepperHat {
 
     fn i2c_write_to_reg_sequence(&mut self, reg: u8, data: &[u8]) -> Result<(), LinuxI2CError> {
         for (data, reg) in data.into_iter().zip(reg..) {
+            log::info!("I2C: Writing {} to the register {}", *data, reg);
             self.i2c_device.write(&[reg, *data])?;
         }
         Ok(())
@@ -27,6 +28,12 @@ impl AdafruitDCStepperHat {
 impl MotorController<LinuxI2CError> for AdafruitDCStepperHat {
     fn set_speed(&mut self, motor_id: u8, speed: f32) -> Result<(), LinuxI2CError> {
         let speed = ((speed.max(0.0).min(1.0) * 4095.0).round()) as u16;
+
+        log::info!(
+            "Adafruit: Setting the speed of motor {} to {}.",
+            motor_id,
+            speed
+        );
 
         let pwm_id: u8 = match motor_id {
             0 => 8,  // PWM8 for speed of motor1
@@ -43,6 +50,12 @@ impl MotorController<LinuxI2CError> for AdafruitDCStepperHat {
     }
 
     fn set_direction(&mut self, motor_id: u8, direction: Directions) -> Result<(), LinuxI2CError> {
+        log::info!(
+            "Adafruit: Setting the direction of motor {} to {:?}.",
+            motor_id,
+            direction
+        );
+
         // AIN1=HIGH, AIN2=LOW => FORWARD, AIN1=LOW, AIN2=HIGH => BACKWARD, _ => BRAKE
         let (ain1_pwm_id, ain2_pwm_id): (u8, u8) = match motor_id {
             0 => (10, 9),  // For the first motor: AIN1=PWM10, AIN2=PWM9
