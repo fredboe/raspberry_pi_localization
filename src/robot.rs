@@ -38,7 +38,7 @@ pub fn perform_action<ERR: Error, M: MotorController<ERR>>(
     action: Action,
     motor_controller: &mut M,
 ) -> Result<(), ERR> {
-    // println!("Perform the action {:?}", action);
+    println!("Perform the action {:?}", action);
 
     match action {
         Action::Idle => {
