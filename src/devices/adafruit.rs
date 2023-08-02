@@ -2,6 +2,12 @@ use crate::robot::{Directions, MotorController};
 use i2cdev::core::*;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
 
+/// # Explanation
+/// This is a simple implementation to work with the Adafruit DC & Stepper Motor HAT for Raspberry Pi.
+/// It provides a simple interface to interact with the 4 motors.
+/// Please check the wiring, as the wiring is/can be different between motors
+/// (with the same wiring one motor will drive forward and one backward etc.).
+/// Here I tried mirroring the python library with that, so there won't be any conflicts.
 pub struct AdafruitDCStepperHat {
     i2c_device: LinuxI2CDevice,
 }
@@ -29,12 +35,6 @@ impl MotorController<LinuxI2CError> for AdafruitDCStepperHat {
     fn set_speed(&mut self, motor_id: u8, speed: f32) -> Result<(), LinuxI2CError> {
         let speed = ((speed.max(0.0).min(1.0) * 4095.0).round()) as u16;
 
-        log::info!(
-            "Adafruit: Setting the speed of motor {} to {}.",
-            motor_id,
-            speed
-        );
-
         let pwm_id: u8 = match motor_id {
             0 => 8,  // PWM8 for speed of motor1
             1 => 13, // PWM13 for speed of motor2
@@ -50,12 +50,6 @@ impl MotorController<LinuxI2CError> for AdafruitDCStepperHat {
     }
 
     fn set_direction(&mut self, motor_id: u8, direction: Directions) -> Result<(), LinuxI2CError> {
-        log::info!(
-            "Adafruit: Setting the direction of motor {} to {:?}.",
-            motor_id,
-            direction
-        );
-
         // AIN1=HIGH, AIN2=LOW => FORWARD, AIN1=LOW, AIN2=HIGH => BACKWARD, _ => BRAKE
         let (ain1_pwm_id, ain2_pwm_id): (u8, u8) = match motor_id {
             0 => (9, 10),  // For the first motor: AIN1=PWM10, AIN2=PWM9

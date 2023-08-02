@@ -1,11 +1,11 @@
-use gilrs::{Button, Gilrs, Axis};
+use gilrs::{Axis, Button, Gilrs};
 
-const GILRS_ERROR: &str = "There was an internal gilrs error. Without it the program cannot handle user input...";
-
+/// The UserInput struct contains one Option for  the joystick data (x, y) and
+/// one Option for a button that was pressed. It is the data holder for the user input.
 #[derive(Debug, Default)]
 pub struct UserInput {
     pub joystick: Option<(f32, f32)>,
-    pub btn: Option<Button>
+    pub btn: Option<Button>,
 }
 
 impl UserInput {
@@ -14,15 +14,17 @@ impl UserInput {
     }
 }
 
-
+/// # Explanation
+/// The UserInputUnit basically is an iterator that when next is called returns the last joystick data
+/// and the last button that was pressed.
 pub struct UserInputUnit {
-    gilrs: Gilrs
+    gilrs: Gilrs,
 }
 
 impl UserInputUnit {
-    pub fn new() -> UserInputUnit {
-        let gilrs = Gilrs::new().expect(GILRS_ERROR);
-        UserInputUnit { gilrs }
+    pub fn new() -> Result<UserInputUnit, gilrs::Error> {
+        let gilrs = Gilrs::new()?;
+        Ok(UserInputUnit { gilrs })
     }
 }
 
@@ -36,9 +38,14 @@ impl Iterator for UserInputUnit {
         let gamepad = self.gilrs.gamepads().next().map(|(_, gamepad)| gamepad);
 
         let result = if let Some(gamepad) = gamepad {
-            let joystick_data = (gamepad.value(Axis::LeftStickX), gamepad.value(Axis::LeftStickY));
-            let btn_pressed = [Button::South, Button::West, Button::East, Button::North].into_iter()
-                .filter(|&btn| gamepad.is_pressed(btn)).next();
+            let joystick_data = (
+                gamepad.value(Axis::LeftStickX),
+                gamepad.value(Axis::LeftStickY),
+            );
+            let btn_pressed = [Button::South, Button::West, Button::East, Button::North]
+                .into_iter()
+                .filter(|&btn| gamepad.is_pressed(btn))
+                .next();
 
             Some(UserInput::new(Some(joystick_data), btn_pressed))
         } else {

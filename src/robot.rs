@@ -1,5 +1,8 @@
 use std::error::Error;
 
+/// # Explanation
+/// The MotorController trait is a trait that can be used to implement a struct that (like the name says)
+/// controls a robot.
 pub trait MotorController<ERR: Error> {
     fn set_speed(&mut self, motor_id: u8, speed: f32) -> Result<(), ERR>;
 
@@ -34,6 +37,9 @@ pub enum Action {
     Drive(f32, f32),
 }
 
+/// # Explanation
+/// perform_action forwards the action to the MotorController. It requires two available motors in the MotorController
+/// (with the ids 0 and 2).
 pub fn perform_action<ERR: Error, M: MotorController<ERR>>(
     action: Action,
     motor_controller: &mut M,

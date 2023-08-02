@@ -16,7 +16,7 @@ fn main() {
     log::info!("Robot started");
 
     let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60).expect("i2c error"); // addr probably wrong
-    let mut user_input_unit = UserInputUnit::new();
+    let mut user_input_unit = UserInputUnit::new().expect("gilrs creation error");
     let mut follow_joystick = FollowJoystick::new();
 
     for _ in GameLoop::from_fps(10) {
