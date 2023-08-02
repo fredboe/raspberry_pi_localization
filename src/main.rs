@@ -12,6 +12,7 @@ mod state;
 mod user_input;
 
 fn main() {
+    println!("Robot started");
     env_logger::init();
 
     let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60).expect("i2c error"); // addr probably wrong
