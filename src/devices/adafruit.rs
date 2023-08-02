@@ -12,6 +12,13 @@ impl AdafruitDCStepperHat {
         Ok(AdafruitDCStepperHat { i2c_device })
     }
 
+    fn i2c_write_to_reg_sequence(&mut self, reg: u8, data: &[u8]) -> Result<(), LinuxI2CError> {
+        for (data, reg) in data.into_iter().zip(reg..) {
+            self.i2c_device.write(&[reg, *data])?;
+        }
+        Ok(())
+    }
+
     fn pwm_id_to_reg(led: u8) -> u8 {
         6 + led * 4
     }
@@ -30,15 +37,9 @@ impl MotorController<LinuxI2CError> for AdafruitDCStepperHat {
         };
 
         let pwm_reg = Self::pwm_id_to_reg(pwm_id);
-        let pwm_data = [
-            pwm_reg,
-            0x00,
-            0x00,
-            speed.to_le_bytes()[0],
-            speed.to_le_bytes()[1],
-        ];
+        let pwm_data = [0x00, 0x00, speed.to_le_bytes()[0], speed.to_le_bytes()[1]];
 
-        self.i2c_device.write(&pwm_data)
+        self.i2c_write_to_reg_sequence(pwm_reg, &pwm_data)
     }
 
     fn set_direction(&mut self, motor_id: u8, direction: Directions) -> Result<(), LinuxI2CError> {
@@ -56,26 +57,17 @@ impl MotorController<LinuxI2CError> for AdafruitDCStepperHat {
 
         let (ain1_data, ain2_data) = match direction {
             Directions::FORWARD => {
-                (
-                    [ain1_reg, 0x00, 0x00, 0xFF, 0x0F],
-                    [ain2_reg, 0x00, 0x00, 0x00, 0x00],
-                ) // Set AIN1 to HIGH and AIN2 to LOW
+                ([0x00, 0x00, 0xFF, 0x0F], [0x00, 0x00, 0x00, 0x00]) // Set AIN1 to HIGH and AIN2 to LOW
             }
             Directions::BACKWARD => {
-                (
-                    [ain1_reg, 0x00, 0x00, 0x00, 0x00],
-                    [ain2_reg, 0x00, 0x00, 0xFF, 0x0F],
-                ) // Set AIN1 to LOW and AIN2 to HIGH
+                ([0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0xFF, 0x0F]) // Set AIN1 to LOW and AIN2 to HIGH
             }
             _ => {
-                (
-                    [ain1_reg, 0x00, 0x00, 0x00, 0x00],
-                    [ain2_reg, 0x00, 0x00, 0x00, 0x00],
-                ) // Set  AIN1 to LOW and AIN2 to LOW
+                ([0x00, 0x00, 0x00, 0x00], [0x00, 0x00, 0x00, 0x00]) // Set  AIN1 to LOW and AIN2 to LOW
             }
         };
 
-        self.i2c_device.write(&ain1_data)?;
-        self.i2c_device.write(&ain2_data)
+        self.i2c_write_to_reg_sequence(ain1_reg, &ain1_data)?;
+        self.i2c_write_to_reg_sequence(ain2_reg, &ain2_data)
     }
 }
