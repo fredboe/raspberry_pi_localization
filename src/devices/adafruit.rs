@@ -15,7 +15,6 @@ impl AdafruitDCStepperHat {
 
     fn i2c_write_to_reg_sequence(&mut self, reg: u8, data: &[u8]) -> Result<(), LinuxI2CError> {
         for (data, reg) in data.into_iter().zip(reg..) {
-            log::info!("I2C: Writing {} to the register {}", *data, reg);
             self.i2c_device.write(&[reg, *data])?;
         }
         Ok(())
