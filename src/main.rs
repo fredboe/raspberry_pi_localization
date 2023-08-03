@@ -42,8 +42,8 @@ fn logger_init() {
         _ => LevelFilter::Info,
     };
 
-    let log_file = std::fs::File::create("log/raspberry_pi_localization.log")
-        .expect("Cannot create log file.");
+    let log_file =
+        std::fs::File::create("raspberry_pi_localization.log").expect("Cannot create log file.");
     WriteLogger::init(log_level, Config::default(), log_file)
         .expect("Logging initialization error.");
 }
