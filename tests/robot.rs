@@ -50,4 +50,9 @@ mod tests {
         assert_eq!(motor_controller.motors[0], (Directions::FORWARD, 0.5));
         assert_eq!(motor_controller.motors[2], (Directions::BACKWARD, 0.25));
     }
+
+    #[test]
+    fn failure_test() {
+        assert_eq!(0, 1);
+    }
 }
