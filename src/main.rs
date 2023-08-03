@@ -2,6 +2,8 @@ use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::robot::perform_action;
 use crate::user_input::{UserInput, UserInputUnit};
+use log::LevelFilter;
+use simplelog::{Config, WriteLogger};
 use std::time::{Duration, Instant};
 
 mod deciders;
@@ -12,10 +14,10 @@ mod state;
 mod user_input;
 
 fn main() {
-    env_logger::init();
+    logger_init();
     log::info!("Robot started");
 
-    let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60).expect("i2c error"); // addr probably wrong
+    let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60).expect("i2c error");
     let mut user_input_unit = UserInputUnit::new().expect("gilrs creation error");
     let mut follow_joystick = FollowJoystick::new();
 
@@ -26,6 +28,24 @@ fn main() {
         let result = perform_action(action, &mut adafruit_dc_controller);
         log::info!("The result of perform_action was {:?}", result);
     }
+}
+
+fn logger_init() {
+    let log_level = std::env::var("RUST_LOG").unwrap_or("info".to_string());
+    let log_level = match log_level.as_str() {
+        "off" => LevelFilter::Off,
+        "error" => LevelFilter::Error,
+        "warn" => LevelFilter::Warn,
+        "info" => LevelFilter::Info,
+        "debug" => LevelFilter::Debug,
+        "trace" => LevelFilter::Trace,
+        _ => LevelFilter::Info,
+    };
+
+    let log_file = std::fs::File::create("log/raspberry_pi_localization.log")
+        .expect("Cannot create log file.");
+    WriteLogger::init(log_level, Config::default(), log_file)
+        .expect("Logging initialization error.");
 }
 
 struct GameLoop {
