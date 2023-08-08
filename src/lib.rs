@@ -4,3 +4,4 @@ pub mod robot;
 pub mod sensor;
 pub mod state;
 pub mod user_input;
+pub mod utils;

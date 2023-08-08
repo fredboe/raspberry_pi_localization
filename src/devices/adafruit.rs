@@ -43,6 +43,12 @@ impl AdafruitDCStepperHat {
 }
 
 impl MotorController<LinuxI2CError> for AdafruitDCStepperHat {
+    /// # Explanation
+    /// It sets the speed of the given motor (the speed value can take values between 0 and 1).
+    ///
+    /// # How it works
+    /// This function firsts calculates the off-time for the pwm signal. Then it sets the
+    /// speed pwm register for the given motor.
     fn set_speed(&mut self, motor_id: u8, speed: f32) -> Result<(), LinuxI2CError> {
         let speed = ((speed.max(0.0).min(1.0) * 4095.0).round()) as u16;
 
@@ -60,6 +66,18 @@ impl MotorController<LinuxI2CError> for AdafruitDCStepperHat {
         self.i2c_write_to_reg_sequence(pwm_reg, &pwm_data)
     }
 
+    /// # Explanation
+    /// It sets the direction the motor should turn to.
+    /// Please keep in mind that the FORWARD direction does not necessarily mean that the
+    /// motor will turn in the forward-direction.
+    ///
+    /// # How it works
+    /// This function first calculates the pwm registers that determine the direction of the motor.
+    /// Then these registers will be set to always HIGH or always LOW based on the given direction
+    /// (keep in mind that these are pwm registers).
+    /// 1. HIGH, LOW = FORWARD
+    /// 2. LOW, HIGH = BACKWARD
+    /// 3. LOW, LOW = BRAKE
     fn set_direction(&mut self, motor_id: u8, direction: Directions) -> Result<(), LinuxI2CError> {
         // AIN1=HIGH, AIN2=LOW => FORWARD, AIN1=LOW, AIN2=HIGH => BACKWARD, _ => BRAKE
         let (ain1_pwm_id, ain2_pwm_id): (u8, u8) = match motor_id {

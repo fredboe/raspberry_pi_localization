@@ -12,6 +12,10 @@ impl UserInput {
     pub fn new(joystick: Option<(f32, f32)>, btn: Option<Button>) -> UserInput {
         UserInput { joystick, btn }
     }
+
+    pub fn is_pressed(&self, btn: Button) -> bool {
+        self.btn.map(|user_btn| user_btn == btn).unwrap_or(false)
+    }
 }
 
 /// # Explanation

@@ -2,7 +2,7 @@ use crate::robot::Action;
 use crate::user_input::UserInput;
 
 pub trait Decider {
-    fn decide(&mut self, user_input: UserInput) -> Action;
+    fn decide(&mut self, user_input: &UserInput) -> Action;
 }
 
 pub struct AlwaysIdle;
@@ -15,7 +15,7 @@ impl AlwaysIdle {
 }
 
 impl Decider for AlwaysIdle {
-    fn decide(&mut self, _: UserInput) -> Action {
+    fn decide(&mut self, _: &UserInput) -> Action {
         Action::Idle
     }
 }
@@ -29,7 +29,7 @@ impl FollowJoystick {
 }
 
 impl Decider for FollowJoystick {
-    fn decide(&mut self, user_input: UserInput) -> Action {
+    fn decide(&mut self, user_input: &UserInput) -> Action {
         let result = if let Some(joystick_data) = user_input.joystick {
             let (jx, jy) = joystick_data;
             let motor_left = (jx + jy).min(1.0).max(-1.0);

@@ -1,9 +1,14 @@
 use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
+use crate::devices::ublox::UBloxM9N;
 use crate::robot::perform_action;
+use crate::sensor::gps::GPSToCartesian;
+use crate::sensor::logic::Sensor;
+use crate::state::Cartesian2DTrack;
 use crate::user_input::{UserInput, UserInputUnit};
-use log::LevelFilter;
-use simplelog::{Config, WriteLogger};
+use crate::utils::Utils;
+use gilrs::Button;
+use std::error::Error;
 use std::time::{Duration, Instant};
 
 mod deciders;
@@ -12,40 +17,53 @@ mod robot;
 mod sensor;
 mod state;
 mod user_input;
+mod utils;
 
-fn main() {
-    logger_init();
+// state und main files überarbeiten
+fn main() -> Result<(), Box<dyn Error>> {
+    Utils::logger_init()?;
     log::info!("Robot started");
 
-    let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60).expect("i2c error");
-    let mut user_input_unit = UserInputUnit::new().expect("gilrs creation error");
-    let mut follow_joystick = FollowJoystick::new();
-
-    for _ in GameLoop::from_fps(10) {
-        let user_input = user_input_unit.next().unwrap_or(UserInput::default());
-        let action = follow_joystick.decide(user_input);
-
-        let result = perform_action(action, &mut adafruit_dc_controller);
-        log::info!("The result of perform_action was {:?}", result);
+    let result = run();
+    if let Err(e) = result {
+        log::error!("{}", e);
+        Err(e)
+    } else {
+        log::info!("The application terminated successfully.");
+        Ok(())
     }
 }
 
-fn logger_init() {
-    let log_level = std::env::var("RUST_LOG").unwrap_or("info".to_string());
-    let log_level = match log_level.as_str() {
-        "off" => LevelFilter::Off,
-        "error" => LevelFilter::Error,
-        "warn" => LevelFilter::Warn,
-        "info" => LevelFilter::Info,
-        "debug" => LevelFilter::Debug,
-        "trace" => LevelFilter::Trace,
-        _ => LevelFilter::Info,
-    };
+fn run() -> Result<(), Box<dyn Error>> {
+    let gps_preprocessor = GPSToCartesian::new(Utils::get_base_point()?);
+    let mut gps_sensor = UBloxM9N::new(0x42)?.attach(gps_preprocessor);
 
-    let log_file =
-        std::fs::File::create("raspberry_pi_localization.log").expect("Cannot create log file.");
-    WriteLogger::init(log_level, Config::default(), log_file)
-        .expect("Logging initialization error.");
+    let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60)?;
+    let mut user_input_unit = UserInputUnit::new()?;
+    let mut follow_joystick = FollowJoystick::new();
+
+    let mut track = Cartesian2DTrack::new();
+
+    for _ in GameLoop::from_fps(16) {
+        let user_input = user_input_unit.next().unwrap_or(UserInput::default());
+        let action = follow_joystick.decide(&user_input);
+
+        gps_sensor.next().map(|coords| track.push(coords));
+
+        if user_input.is_pressed(Button::East) {
+            track.plot("track1.png").unwrap_or_else(|e| {
+                log::warn!("Error at plotting the track: {}", e);
+                ()
+            });
+        }
+
+        // abstract with log_on_error()
+        perform_action(action, &mut adafruit_dc_controller).unwrap_or_else(|e| {
+            log::warn!("Error while performing an action: {}", e);
+            ()
+        });
+    }
+    Ok(())
 }
 
 struct GameLoop {
