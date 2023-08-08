@@ -29,7 +29,6 @@ impl UBloxM9N {
         let mut data_buffer = vec![0u8; num_bytes as usize];
         self.i2c_device.read(data_buffer.as_mut_slice())?;
 
-        log::info!("{:?}", data_buffer);
         Ok(data_buffer)
     }
 }

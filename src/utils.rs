@@ -29,15 +29,19 @@ impl Utils {
     /// # Explanation
     /// This function parses the given buffer to the RMC format.
     pub fn parse_to_rmc(data: Vec<u8>) -> Option<RmcData> {
-        let re = Regex::new(r"\$GPRMC.{0,100}\r\n").unwrap();
+        let re = Regex::new(r"\$GNRMC.{0,100}\r\n").unwrap();
 
         let parse_result = String::from_utf8(data)
             .ok()
             .and_then(|data_string| {
+                log::info!("Data String: {}", &data_string);
                 re.find(data_string.as_str())
                     .map(|rmc_match| rmc_match.as_str().to_string())
             })
-            .and_then(|rmc_string| nmea::parse_str(rmc_string.as_str()).ok());
+            .and_then(|rmc_string| {
+                log::info!("RMC string: {}", &rmc_string);
+                nmea::parse_str(rmc_string.as_str()).ok()
+            });
 
         match parse_result {
             Some(ParseResult::RMC(rmc_data)) => Some(rmc_data),
