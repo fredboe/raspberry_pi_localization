@@ -1,12 +1,12 @@
 use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
-use crate::devices::ublox::UBloxM9N;
+use crate::devices::ublox::SimpleUbloxSensor;
 use crate::robot::perform_action;
 use crate::sensor::gps::GPSToCartesian;
 use crate::sensor::logic::Sensor;
-use crate::state::Cartesian2DTrack;
+use crate::state::{plot_track, Cartesian2DTrack};
 use crate::user_input::{UserInput, UserInputUnit};
-use crate::utils::Utils;
+use crate::utils::{LogErrUnwrap, Utils};
 use gilrs::Button;
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -19,7 +19,6 @@ mod state;
 mod user_input;
 mod utils;
 
-// state und main files überarbeiten
 fn main() -> Result<(), Box<dyn Error>> {
     Utils::logger_init()?;
     log::info!("Robot started");
@@ -35,19 +34,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
-    let mut gps_sensor = UBloxM9N::new(0x42)?;
-
-    for _ in GameLoop::from_fps(10) {
-        let data = gps_sensor.read_from_device()?;
-        let s = String::from_utf8(data)?;
-        println!("{:?}", s);
-        log::info!("{:?}", s);
-        println!();
-        println!();
-        println!();
-    }
-    /*let gps_preprocessor = GPSToCartesian::new(Utils::get_base_point()?);
-    let mut gps_sensor = UBloxM9N::new(0x42)?.attach(gps_preprocessor);
+    let gps_preprocessor = GPSToCartesian::new(Utils::get_base_point()?);
+    let mut gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?.attach(gps_preprocessor);
 
     let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60)?;
     let mut user_input_unit = UserInputUnit::new()?;
@@ -62,18 +50,11 @@ fn run() -> Result<(), Box<dyn Error>> {
         gps_sensor.next().map(|coords| track.push(coords));
 
         if user_input.is_pressed(Button::East) {
-            track.plot("track1.png").unwrap_or_else(|e| {
-                log::warn!("Error at plotting the track: {}", e);
-                ()
-            });
+            plot_track(&mut track, "track.png").log_err_unwrap(());
         }
 
-        // abstract with log_on_error()
-        perform_action(action, &mut adafruit_dc_controller).unwrap_or_else(|e| {
-            log::warn!("Error while performing an action: {}", e);
-            ()
-        });
-    }*/
+        perform_action(action, &mut adafruit_dc_controller).log_err_unwrap(());
+    }
     Ok(())
 }
 
@@ -91,7 +72,7 @@ impl GameLoop {
         }
     }
 
-    fn from_fps(fps: u8) -> GameLoop {
+    fn from_fps(fps: u16) -> GameLoop {
         let duration_per_frame = Duration::from_secs_f32(1.0 / (fps as f32));
         Self::new(duration_per_frame)
     }

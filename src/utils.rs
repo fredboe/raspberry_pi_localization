@@ -4,6 +4,7 @@ use nmea::ParseResult;
 use regex::Regex;
 use simplelog::{Config, WriteLogger};
 use std::error::Error;
+use std::fmt::Display;
 use std::io::ErrorKind;
 use std::str::FromStr;
 
@@ -68,5 +69,18 @@ impl Utils {
         let log_file = std::fs::File::create("raspberry_pi_localization.log")?;
         WriteLogger::init(log_level, Config::default(), log_file)?;
         Ok(())
+    }
+}
+
+pub trait LogErrUnwrap<T> {
+    fn log_err_unwrap(self, value: T) -> T;
+}
+
+impl<T, E: Display> LogErrUnwrap<T> for Result<T, E> {
+    fn log_err_unwrap(self, value: T) -> T {
+        self.unwrap_or_else(|e| {
+            log::error!("{}", e);
+            value
+        })
     }
 }
