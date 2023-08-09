@@ -35,7 +35,18 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
-    let gps_preprocessor = GPSToCartesian::new(Utils::get_base_point()?);
+    let mut gps_sensor = UBloxM9N::new(0x42)?;
+
+    for _ in GameLoop::from_fps(10) {
+        let data = gps_sensor.read_from_device()?;
+        let s = String::from_utf8(data)?;
+        println!("{:?}", s);
+        log::info!("{:?}", s);
+        println!();
+        println!();
+        println!();
+    }
+    /*let gps_preprocessor = GPSToCartesian::new(Utils::get_base_point()?);
     let mut gps_sensor = UBloxM9N::new(0x42)?.attach(gps_preprocessor);
 
     let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60)?;
@@ -62,7 +73,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             log::warn!("Error while performing an action: {}", e);
             ()
         });
-    }
+    }*/
     Ok(())
 }
 

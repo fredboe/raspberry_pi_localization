@@ -20,7 +20,7 @@ impl UBloxM9N {
     /// # How it works
     /// The function first reads the addresses 0xFD and 0xFE to know how many bytes can be read from the device.
     /// Then there are that many bytes read from the address 0xFF.
-    fn read_from_device(&mut self) -> Result<Vec<u8>, LinuxI2CError> {
+    pub fn read_from_device(&mut self) -> Result<Vec<u8>, LinuxI2CError> {
         let mut num_bytes = [0, 0];
         self.i2c_device.write(&[0xFD])?;
         self.i2c_device.read(&mut num_bytes)?;
