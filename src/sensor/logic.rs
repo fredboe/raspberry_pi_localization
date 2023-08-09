@@ -72,6 +72,7 @@ pub struct CombinedSensor<T, U, S1: Sensor<T>, S2: Sensor<U>> {
 }
 
 impl<T, U, S1: Sensor<T>, S2: Sensor<U>> CombinedSensor<T, U, S1, S2> {
+    #[allow(dead_code)]
     pub fn new(sensor1: S1, sensor2: S2) -> Self {
         CombinedSensor {
             sensor1,

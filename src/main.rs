@@ -50,6 +50,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         gps_sensor.next().map(|coords| track.push(coords));
 
         if user_input.is_pressed(Button::East) {
+            log::info!("Plotting the track.");
             plot_track(&mut track, "track.png").log_err_unwrap(());
         }
 
