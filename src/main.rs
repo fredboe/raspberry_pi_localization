@@ -43,7 +43,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let mut track = Cartesian2DTrack::new();
 
-    for _ in GameLoop::from_fps(16) {
+    for _ in GameLoop::from_fps(2) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
         let action = follow_joystick.decide(&user_input);
 
