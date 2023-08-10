@@ -2,6 +2,7 @@ use crate::sensor::gps::GeoCoord;
 use crate::sensor::logic::Sensor;
 use crate::utils::Utils;
 use serialport::SerialPort;
+use std::io::Read;
 
 pub struct SimpleUbloxSensor {
     port: Box<dyn SerialPort>,

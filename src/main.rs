@@ -47,7 +47,10 @@ fn run() -> Result<(), Box<dyn Error>> {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
         let action = follow_joystick.decide(&user_input);
 
-        gps_sensor.next().map(|coords| track.push(coords));
+        gps_sensor.next().map(|coords| {
+            log::info!("Adding {:?} to the track.", coords);
+            track.push(coords)
+        });
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");

@@ -35,8 +35,7 @@ pub fn plot_track(track: &mut Cartesian2DTrack, filename: &str) -> Result<(), Bo
 }
 
 /// # Explanation
-/// This function extracts the bottom-left corner of the induced rectangle formed by the track.
-/// So basically (x.min(), y.min()).
+/// This function extracts the bottom-left corner of the induced rectangle
 pub fn min_point_track(track: &Cartesian2DTrack) -> Option<Cartesian2D> {
     if track.len() > 0 {
         Some(
@@ -51,9 +50,6 @@ pub fn min_point_track(track: &Cartesian2DTrack) -> Option<Cartesian2D> {
     }
 }
 
-/// # Explanation
-/// This function extracts the top-right corner of the induced rectangle formed by the track.
-/// So basically (x.max(), y.max()).
 pub fn max_point_track(track: &Cartesian2DTrack) -> Option<Cartesian2D> {
     if track.len() > 0 {
         Some(track.iter().fold(
