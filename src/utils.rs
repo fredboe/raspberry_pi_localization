@@ -32,8 +32,6 @@ impl Utils {
     pub fn parse_to_rmc(data: Vec<u8>) -> Option<RmcData> {
         let re = Regex::new(r"\$GNRMC.{0,100}\r\n").unwrap();
 
-        log::info!("{}", data.len());
-
         let parse_result = String::from_utf8(data)
             .ok()
             .and_then(|data_string| {
