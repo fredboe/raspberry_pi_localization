@@ -46,6 +46,11 @@ impl GPSToCartesian {
 impl Preprocessor<GeoCoord, Cartesian2D> for GPSToCartesian {
     fn run(&mut self, x: GeoCoord) -> Cartesian2D {
         let geo_coord = x;
+        log::info!(
+            "The geo coords were {} N, {} E",
+            geo_coord.lat,
+            geo_coord.lon
+        );
         let (base_point_lat, base_point_lon): (f64, f64) = self.base_point;
 
         let r_earth: f64 = 6371.0;
