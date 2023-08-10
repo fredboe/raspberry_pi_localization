@@ -37,14 +37,10 @@ impl Utils {
         let parse_result = String::from_utf8(data)
             .ok()
             .and_then(|data_string| {
-                log::info!("Data String: {}", &data_string);
                 re.find(data_string.as_str())
                     .map(|rmc_match| rmc_match.as_str().to_string())
             })
-            .and_then(|rmc_string| {
-                log::info!("RMC string: {}", &rmc_string);
-                nmea::parse_str(rmc_string.as_str()).ok()
-            });
+            .and_then(|rmc_string| nmea::parse_str(rmc_string.as_str()).ok());
 
         match parse_result {
             Some(ParseResult::RMC(rmc_data)) => Some(rmc_data),
