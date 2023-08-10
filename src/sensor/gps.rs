@@ -45,12 +45,14 @@ impl GPSToCartesian {
 
 impl Preprocessor<GeoCoord, Cartesian2D> for GPSToCartesian {
     fn run(&mut self, x: GeoCoord) -> Cartesian2D {
-        let gps_data = x;
-        let (base_point_lat, base_point_long): (f64, f64) = self.base_point;
+        let geo_coord = x;
+        let (base_point_lat, base_point_lon): (f64, f64) = self.base_point;
 
         let r_earth: f64 = 6371.0;
-        let east = (gps_data.lon - base_point_long) * base_point_lat.cos() * r_earth;
-        let north = (gps_data.lat - base_point_lat) * r_earth;
+        let radian_lat_diff = (geo_coord.lon - base_point_lon).to_radians();
+        let radian_lon_diff = (geo_coord.lat - base_point_lon).to_radians();
+        let east = radian_lon_diff * base_point_lat.to_radians().cos() * r_earth;
+        let north = radian_lat_diff * r_earth;
 
         Cartesian2D(east, north)
     }
