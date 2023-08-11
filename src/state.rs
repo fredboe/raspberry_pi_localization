@@ -11,8 +11,12 @@ pub fn plot_track(track: &mut Cartesian2DTrack, filename: &str) -> Result<(), Bo
     let root = BitMapBackend::new(filename, (1000, 1000)).into_drawing_area();
     root.fill(&WHITE)?;
 
-    let Cartesian2D(x_min, y_min) = min_point_track(&track).unwrap_or(Cartesian2D(-1.0, -1.0));
-    let Cartesian2D(x_max, y_max) = max_point_track(&track).unwrap_or(Cartesian2D(1.0, 1.0));
+    let Cartesian2D {
+        x: x_min, y: y_min, ..
+    } = min_point_track(&track).unwrap_or(Cartesian2D::new(-1.0, -1.0));
+    let Cartesian2D {
+        x: x_max, y: y_max, ..
+    } = max_point_track(&track).unwrap_or(Cartesian2D::new(1.0, 1.0));
 
     let mut chart = ChartBuilder::on(&root)
         .caption("Track Plot", ("sans-serif", 40).into_font())
@@ -25,7 +29,7 @@ pub fn plot_track(track: &mut Cartesian2DTrack, filename: &str) -> Result<(), Bo
 
     // Draw the track
     chart.draw_series(LineSeries::new(
-        track.iter().map(|coord| (coord.0, coord.1)),
+        track.iter().map(|coord| (coord.x, coord.y)),
         &RED,
     ))?;
 
@@ -41,7 +45,7 @@ pub fn min_point_track(track: &Cartesian2DTrack) -> Option<Cartesian2D> {
         Some(
             track
                 .iter()
-                .fold(Cartesian2D(f64::INFINITY, f64::INFINITY), |c1, c2| {
+                .fold(Cartesian2D::new(f64::INFINITY, f64::INFINITY), |c1, c2| {
                     min_fold(&c1, c2)
                 }),
         )
@@ -53,7 +57,7 @@ pub fn min_point_track(track: &Cartesian2DTrack) -> Option<Cartesian2D> {
 pub fn max_point_track(track: &Cartesian2DTrack) -> Option<Cartesian2D> {
     if track.len() > 0 {
         Some(track.iter().fold(
-            Cartesian2D(f64::NEG_INFINITY, f64::NEG_INFINITY),
+            Cartesian2D::new(f64::NEG_INFINITY, f64::NEG_INFINITY),
             |c1, c2| max_fold(&c1, c2),
         ))
     } else {
@@ -62,9 +66,9 @@ pub fn max_point_track(track: &Cartesian2DTrack) -> Option<Cartesian2D> {
 }
 
 fn min_fold(a: &Cartesian2D, b: &Cartesian2D) -> Cartesian2D {
-    Cartesian2D(a.0.min(b.0), a.1.min(b.1))
+    Cartesian2D::new(a.x.min(b.x), a.y.min(b.y))
 }
 
 fn max_fold(a: &Cartesian2D, b: &Cartesian2D) -> Cartesian2D {
-    Cartesian2D(a.0.max(b.0), a.1.max(b.1))
+    Cartesian2D::new(a.x.max(b.x), a.y.max(b.y))
 }

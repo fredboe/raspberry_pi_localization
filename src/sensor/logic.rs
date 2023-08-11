@@ -19,6 +19,7 @@ pub trait Sensor<T>: Iterator<Item = T> {
 }
 
 pub trait Preprocessor<X, Y> {
+    // maybe add an error type here
     fn run(&mut self, x: X) -> Y;
 }
 

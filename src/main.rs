@@ -2,7 +2,7 @@ use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::devices::ublox::SimpleUbloxSensor;
 use crate::robot::perform_action;
-use crate::sensor::gps::GPSToCartesian;
+use crate::sensor::gps::{GeoCoord, GeoToENU};
 use crate::sensor::logic::Sensor;
 use crate::state::{plot_track, Cartesian2DTrack};
 use crate::user_input::{UserInput, UserInputUnit};
@@ -34,7 +34,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn run() -> Result<(), Box<dyn Error>> {
-    let gps_preprocessor = GPSToCartesian::new(Utils::get_base_point()?);
+    let (base_point_lon, base_point_lat) = Utils::get_base_point()?;
+    let gps_preprocessor = GeoToENU::new(GeoCoord::new(base_point_lon, base_point_lat));
     let mut gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?.attach(gps_preprocessor);
 
     let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60)?;
@@ -43,7 +44,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let mut track = Cartesian2DTrack::new();
 
-    for _ in GameLoop::from_fps(10) {
+    for _ in GameLoop::from_fps(15) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
         let action = follow_joystick.decide(&user_input);
 

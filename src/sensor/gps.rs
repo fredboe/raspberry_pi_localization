@@ -1,10 +1,11 @@
 use crate::sensor::logic::Preprocessor;
+use nalgebra::{Matrix3, Vector3};
 use nmea::sentences::RmcData;
 
 #[derive(Debug, Copy, Clone)]
 pub struct GeoCoord {
-    lon: f64,
-    lat: f64,
+    pub lon: f64,
+    pub lat: f64,
 }
 
 impl GeoCoord {
@@ -31,34 +32,87 @@ impl GeoCoord {
 }
 
 #[derive(Debug, Copy, Clone)]
-pub struct Cartesian2D(pub f64, pub f64);
-
-pub struct GPSToCartesian {
-    base_point: (f64, f64),
+pub struct Cartesian2D {
+    pub x: f64,
+    pub y: f64,
 }
 
-impl GPSToCartesian {
-    pub fn new(base_point: (f64, f64)) -> Self {
-        GPSToCartesian { base_point }
+impl Cartesian2D {
+    pub fn new(x: f64, y: f64) -> Self {
+        Cartesian2D { x, y }
     }
 }
 
-impl Preprocessor<GeoCoord, Cartesian2D> for GPSToCartesian {
+pub struct GeoToECEF;
+
+impl GeoToECEF {
+    pub fn new() -> Self {
+        GeoToECEF {}
+    }
+
+    fn n(rad: f64) -> f64 {
+        const ELLIPSE_A: f64 = 6378137.0;
+        const ECCENTRICITY: f64 = 0.00669437999014;
+        ELLIPSE_A / (1.0 - ECCENTRICITY * rad.sin() * rad.sin()).sqrt()
+    }
+}
+
+impl Preprocessor<GeoCoord, Cartesian2D> for GeoToECEF {
     fn run(&mut self, x: GeoCoord) -> Cartesian2D {
         let geo_coord = x;
-        log::info!(
-            "The geo coords were {} N, {} E",
-            geo_coord.lat,
-            geo_coord.lon
+        let rad_lat = geo_coord.lat.to_radians();
+        let rad_lon = geo_coord.lon.to_radians();
+        let x = Self::n(rad_lat) * rad_lat.cos() * rad_lon.cos();
+        let y = Self::n(rad_lat) * rad_lat.cos() * rad_lon.sin();
+
+        Cartesian2D::new(x, y)
+    }
+}
+
+pub struct GeoToENU {
+    base_point: Cartesian2D,
+    rotation_matrix: Matrix3<f64>,
+    ecef: GeoToECEF,
+}
+
+impl GeoToENU {
+    pub fn new(base_point: GeoCoord) -> Self {
+        let mut ecef = GeoToECEF::new();
+        let GeoCoord {
+            lon: b_lon,
+            lat: b_lat,
+        } = base_point;
+
+        let rotation_matrix = Matrix3::new(
+            -b_lon.sin(),
+            b_lon.cos(),
+            0.0,
+            -b_lat.sin() * b_lon.cos(),
+            -b_lat.sin() * b_lon.sin(),
+            b_lat.cos(),
+            b_lat.cos() * b_lon.cos(),
+            b_lat.cos() * b_lon.sin(),
+            b_lat.sin(),
         );
-        let (base_point_lat, base_point_lon): (f64, f64) = self.base_point;
 
-        let r_earth: f64 = 6371.0; // Earth's radius in kilometers
-        let radian_lat_diff = (geo_coord.lat - base_point_lat).to_radians();
-        let radian_lon_diff = (geo_coord.lon - base_point_lon).to_radians();
-        let east = radian_lon_diff * base_point_lat.to_radians().cos() * r_earth;
-        let north = radian_lat_diff * r_earth;
+        GeoToENU {
+            base_point: ecef.run(base_point),
+            rotation_matrix,
+            ecef,
+        }
+    }
+}
 
-        Cartesian2D(east, north)
+impl Preprocessor<GeoCoord, Cartesian2D> for GeoToENU {
+    fn run(&mut self, x: GeoCoord) -> Cartesian2D {
+        let ecef_coord = self.ecef.run(x);
+        let ecef_diff = Vector3::new(
+            ecef_coord.x - self.base_point.x,
+            ecef_coord.y - self.base_point.y,
+            0.0,
+        );
+        let enu_coords = self.rotation_matrix * ecef_diff;
+
+        Cartesian2D::new(enu_coords.x, enu_coords.y)
     }
 }
