@@ -24,12 +24,18 @@ pub fn plot_track(track: &mut Cartesian2DTrack, filename: &str) -> Result<(), Bo
         y_max - y_min
     };
 
+    let x_avg = (x_min + x_max) / 2.0;
+    let y_avg = (y_min + y_max) / 2.0;
+
     let mut chart = ChartBuilder::on(&root)
         .caption("Track Plot", ("sans-serif", 40).into_font())
         .margin(5)
         .x_label_area_size(30)
         .y_label_area_size(30)
-        .build_cartesian_2d(x_min..x_min + diff, y_min..y_min + diff)?;
+        .build_cartesian_2d(
+            x_avg - diff / 2.0..x_avg + diff / 2.0,
+            y_avg - diff / 2.0..y_avg + diff / 2.0,
+        )?;
 
     chart.configure_mesh().draw()?;
 
@@ -60,6 +66,8 @@ pub fn min_point_track(track: &Cartesian2DTrack) -> Option<Cartesian2D> {
     }
 }
 
+/// # Explanation
+/// This function extracts the top-right corner of the induced rectangle
 pub fn max_point_track(track: &Cartesian2DTrack) -> Option<Cartesian2D> {
     if track.len() > 0 {
         Some(track.iter().fold(

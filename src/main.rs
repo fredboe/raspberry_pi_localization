@@ -1,10 +1,10 @@
 use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::devices::ublox::SimpleUbloxSensor;
+use crate::plotting::{plot_track, Cartesian2DTrack};
 use crate::robot::perform_action;
 use crate::sensor::gps::{GeoCoord, GeoToENU};
 use crate::sensor::logic::Sensor;
-use crate::state::{plot_track, Cartesian2DTrack};
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{LogErrUnwrap, Utils};
 use gilrs::Button;
@@ -13,9 +13,9 @@ use std::time::{Duration, Instant};
 
 mod deciders;
 mod devices;
+mod plotting;
 mod robot;
 mod sensor;
-mod state;
 mod user_input;
 mod utils;
 

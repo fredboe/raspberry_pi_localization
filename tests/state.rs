@@ -1,7 +1,7 @@
 #[cfg(test)]
 mod tests {
+    use raspberry_pi_localization::plotting::{max_point_track, min_point_track, Cartesian2DTrack};
     use raspberry_pi_localization::sensor::gps::Cartesian2D;
-    use raspberry_pi_localization::state::{max_point_track, min_point_track, Cartesian2DTrack};
 
     #[test]
     fn test_min_max_point_on_track() {
