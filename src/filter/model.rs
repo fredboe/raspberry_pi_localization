@@ -103,6 +103,12 @@ pub fn constant_velocity(q: f64) -> LinearTransitionModel<4> {
 /// # Explanation
 /// The xy measurement model assumes that only the position is measured so that the measurement dimension
 /// is two (x, y).
+///
+/// # Parameters
+/// The error_x parameter represents the uncertainty in the x-axis.
+/// The error_y parameter represents the uncertainty in the y-axis.
+///
+/// SD is the dimension of the state vectors.
 pub fn x_y_measurement_model<const SD: usize>(
     error_x: f64,
     error_y: f64,

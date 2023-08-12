@@ -46,7 +46,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let initial_state = get_initial_state_for_constant_velocity(&mut gps_sensor);
     let mut track: KalmanTrack<4, 2, Cartesian2D> = KalmanTrack::new(
         initial_state,
-        x_y_measurement_model(SMatrix::<f64, 2, 2>::identity()),
+        x_y_measurement_model(1., 1.),
         constant_velocity(0.05),
     );
 
