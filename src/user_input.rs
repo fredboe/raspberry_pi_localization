@@ -1,7 +1,7 @@
 use gilrs::{Axis, Button, Gilrs};
 
-/// The UserInput struct contains one Option for  the joystick data (x, y) and
-/// one Option for a button that was pressed. It is the data holder for the user input.
+/// The UserInput struct contains one option for the joystick data (jx, jy) and
+/// one option for a button that was pressed. It is the data holder for the user input.
 #[derive(Debug, Default)]
 pub struct UserInput {
     pub joystick: Option<(f32, f32)>,

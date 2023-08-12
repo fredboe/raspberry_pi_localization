@@ -2,7 +2,7 @@ use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::devices::ublox::SimpleUbloxSensor;
 use crate::robot::perform_action;
-use crate::sensor::gps::{Cartesian2D, GeoCoord, GeoToENU};
+use crate::sensor::gps::{Cartesian2D, GeoToENU};
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{LogErrUnwrap, Utils};
 use gilrs::Button;
@@ -33,9 +33,12 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
 }
 
+/// # Explanation
+/// The run function first initializes the gps sensor, the motor controller, the decider and the track.
+/// Then for every "frame" in the game loop the user input is retrieved; the gps sensor is asked for
+/// the position which is then added to the track and in the end the action the decider returned is executed.
 fn run() -> Result<(), Box<dyn Error>> {
-    let (base_point_lon, base_point_lat) = Utils::get_base_point()?;
-    let cartesian_converter = GeoToENU::new(GeoCoord::new(base_point_lon, base_point_lat));
+    let cartesian_converter = GeoToENU::new(Utils::get_base_point()?);
     let mut gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?
         .map(move |geo_coord| cartesian_converter.convert(geo_coord));
 
@@ -52,7 +55,6 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     for _ in GameLoop::from_fps(15) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
-        let action = follow_joystick.decide(&user_input);
 
         gps_sensor.next().map(|coords| {
             log::info!("Adding {:?} to the track.", coords);
@@ -66,6 +68,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 .log_err_unwrap(());
         }
 
+        let action = follow_joystick.decide(&user_input);
         perform_action(action, &mut adafruit_dc_controller).log_err_unwrap(());
     }
     Ok(())
@@ -108,6 +111,9 @@ impl Iterator for GameLoop {
     }
 }
 
+/// # Explanation
+/// This function asks the gps sensor for the position and then sets the position of the initial state
+/// to the returned position and the velocity of the initial state to 0.
 fn get_initial_state_for_constant_velocity<GPS: Iterator<Item = Cartesian2D>>(
     gps_sensor: &mut GPS,
 ) -> GaussianState<4> {

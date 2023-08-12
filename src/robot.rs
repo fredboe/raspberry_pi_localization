@@ -14,6 +14,8 @@ pub trait MotorController<ERR: Error> {
     }
 }
 
+/// # Explanation
+/// The directions enum consists of all the modes a motor can have (FORWARD, BACKWARD and BREAK).
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum Directions {
     FORWARD,
@@ -33,6 +35,9 @@ impl From<f32> for Directions {
     }
 }
 
+/// # Explanation
+/// The action enum contains all possible actions the robot can perform. Currently it is Idle (not moving)
+/// and Drive(speed of the left motor, speed of the right motor).
 #[derive(Debug)]
 pub enum Action {
     Idle,
@@ -40,8 +45,8 @@ pub enum Action {
 }
 
 /// # Explanation
-/// perform_action forwards the action to the MotorController. It requires two available motors in the MotorController
-/// (with the ids 0 and 2).
+/// perform_action forwards the action to the MotorController. It requires that two motors are connected to the motor controller.
+/// These motors must have the ids 0 and 2.
 pub fn perform_action<ERR: Error, M: MotorController<ERR>>(
     action: Action,
     motor_controller: &mut M,
