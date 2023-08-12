@@ -1,5 +1,4 @@
-use crate::sensor::logic::Preprocessor;
-use nalgebra::{Matrix3, Vector3};
+use nalgebra::{Matrix3, SVector, Vector3};
 use nmea::sentences::RmcData;
 
 #[derive(Debug, Copy, Clone)]
@@ -43,6 +42,12 @@ impl Cartesian2D {
     }
 }
 
+impl Into<SVector<f64, 2>> for Cartesian2D {
+    fn into(self) -> SVector<f64, 2> {
+        SVector::<f64, 2>::new(self.x, self.y)
+    }
+}
+
 pub struct GeoToECEF;
 
 impl GeoToECEF {
@@ -55,10 +60,8 @@ impl GeoToECEF {
         const ECCENTRICITY: f64 = 0.00669437999014;
         ELLIPSE_A / (1.0 - ECCENTRICITY * rad.sin() * rad.sin()).sqrt()
     }
-}
 
-impl Preprocessor<GeoCoord, Cartesian2D> for GeoToECEF {
-    fn run(&mut self, x: GeoCoord) -> Cartesian2D {
+    pub fn convert(&self, x: GeoCoord) -> Cartesian2D {
         let geo_coord = x;
         let rad_lat = geo_coord.lat.to_radians();
         let rad_lon = geo_coord.lon.to_radians();
@@ -77,7 +80,7 @@ pub struct GeoToENU {
 
 impl GeoToENU {
     pub fn new(base_point: GeoCoord) -> Self {
-        let mut ecef = GeoToECEF::new();
+        let ecef = GeoToECEF::new();
         let GeoCoord {
             lon: b_lon,
             lat: b_lat,
@@ -96,16 +99,14 @@ impl GeoToENU {
         );
 
         GeoToENU {
-            base_point: ecef.run(base_point),
+            base_point: ecef.convert(base_point),
             rotation_matrix,
             ecef,
         }
     }
-}
 
-impl Preprocessor<GeoCoord, Cartesian2D> for GeoToENU {
-    fn run(&mut self, x: GeoCoord) -> Cartesian2D {
-        let ecef_coord = self.ecef.run(x);
+    pub fn convert(&self, x: GeoCoord) -> Cartesian2D {
+        let ecef_coord = self.ecef.convert(x);
         let ecef_diff = Vector3::new(
             ecef_coord.x - self.base_point.x,
             ecef_coord.y - self.base_point.y,

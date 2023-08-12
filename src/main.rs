@@ -1,19 +1,19 @@
 use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::devices::ublox::SimpleUbloxSensor;
-use crate::plotting::{plot_track, Cartesian2DTrack};
 use crate::robot::perform_action;
-use crate::sensor::gps::{GeoCoord, GeoToENU};
-use crate::sensor::logic::Sensor;
+use crate::sensor::gps::{Cartesian2D, GeoCoord, GeoToENU};
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{LogErrUnwrap, Utils};
 use gilrs::Button;
+use nalgebra::{SMatrix, SVector};
+use raspberry_pi_localization::filter::model::{constant_velocity, x_y_measurement_model};
+use raspberry_pi_localization::filter::track::{GaussianState, KalmanTrack};
 use std::error::Error;
 use std::time::{Duration, Instant};
 
 mod deciders;
 mod devices;
-mod plotting;
 mod robot;
 mod sensor;
 mod user_input;
@@ -35,14 +35,20 @@ fn main() -> Result<(), Box<dyn Error>> {
 
 fn run() -> Result<(), Box<dyn Error>> {
     let (base_point_lon, base_point_lat) = Utils::get_base_point()?;
-    let gps_preprocessor = GeoToENU::new(GeoCoord::new(base_point_lon, base_point_lat));
-    let mut gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?.attach(gps_preprocessor);
+    let cartesian_converter = GeoToENU::new(GeoCoord::new(base_point_lon, base_point_lat));
+    let mut gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?
+        .map(move |geo_coord| cartesian_converter.convert(geo_coord));
 
     let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60)?;
     let mut user_input_unit = UserInputUnit::new()?;
     let mut follow_joystick = FollowJoystick::new();
 
-    let mut track = Cartesian2DTrack::new();
+    let initial_state = get_initial_state_for_constant_velocity(&mut gps_sensor);
+    let mut track: KalmanTrack<4, 2, Cartesian2D> = KalmanTrack::new(
+        initial_state,
+        x_y_measurement_model(),
+        constant_velocity(0.05),
+    );
 
     for _ in GameLoop::from_fps(15) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
@@ -50,12 +56,14 @@ fn run() -> Result<(), Box<dyn Error>> {
 
         gps_sensor.next().map(|coords| {
             log::info!("Adding {:?} to the track.", coords);
-            track.push(coords)
+            track.new_measurement(coords)
         });
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");
-            plot_track(&mut track, "track.png").log_err_unwrap(());
+            track
+                .plot_track::<0, 1, 0, 1>("track.png")
+                .log_err_unwrap(());
         }
 
         perform_action(action, &mut adafruit_dc_controller).log_err_unwrap(());
@@ -98,4 +106,20 @@ impl Iterator for GameLoop {
 
         Some(())
     }
+}
+
+fn get_initial_state_for_constant_velocity<GPS: Iterator<Item = Cartesian2D>>(
+    gps_sensor: &mut GPS,
+) -> GaussianState<4> {
+    let initial_position = loop {
+        let position = gps_sensor.next();
+        if let Some(position) = position {
+            break position;
+        }
+    };
+
+    GaussianState::new(
+        SVector::<f64, 4>::new(initial_position.x, initial_position.y, 0., 0.),
+        SMatrix::<f64, 4, 4>::identity(),
+    )
 }

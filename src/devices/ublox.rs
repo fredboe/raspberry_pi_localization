@@ -1,5 +1,4 @@
 use crate::sensor::gps::GeoCoord;
-use crate::sensor::logic::Sensor;
 use crate::utils::Utils;
 use serialport::SerialPort;
 use std::io::Read;
@@ -33,5 +32,3 @@ impl Iterator for SimpleUbloxSensor {
             .and_then(|rmc_data| GeoCoord::from_rmc(rmc_data))
     }
 }
-
-impl Sensor<GeoCoord> for SimpleUbloxSensor {}
