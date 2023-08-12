@@ -13,6 +13,9 @@ pub struct AdafruitDCStepperHat {
 }
 
 impl AdafruitDCStepperHat {
+    /// # Explanation
+    /// This function creates a connection to the adafruit motor driver and then writes 0x00 to the
+    /// 0 Register in order to reset/start the device.
     pub fn new(i2c_addr: u16) -> Result<AdafruitDCStepperHat, LinuxI2CError> {
         let mut i2c_device = LinuxI2CDevice::new("/dev/i2c-1", i2c_addr)?;
         i2c_device.write(&[0x00, 0x00])?;

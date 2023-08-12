@@ -3,6 +3,9 @@ use crate::utils::Utils;
 use serialport::SerialPort;
 use std::io::Read;
 
+/// # Explanation
+/// This is a simple interface to an ublox gps sensor that is connected via usb. With this interface
+/// one is able to retrieve the nmea rmc sentences the devices sends over the usb connection.
 pub struct SimpleUbloxSensor {
     port: Box<dyn SerialPort>,
 }
@@ -13,6 +16,8 @@ impl SimpleUbloxSensor {
         Ok(SimpleUbloxSensor { port })
     }
 
+    /// # Explanation
+    /// This function reads all the available data from the usb connection.
     pub fn read_from_device(&mut self) -> std::io::Result<Vec<u8>> {
         let bytes_to_read = self.port.bytes_to_read()?;
         let mut data_buffer = vec![0u8; bytes_to_read as usize];
@@ -23,6 +28,9 @@ impl SimpleUbloxSensor {
     }
 }
 
+/// # Explanation
+/// Iterator to retrieve the geographic coordinates (longitude and latitude) of the sensor.
+/// The iterator reads the available data from the sensor and retrieves the geographic coordinates.
 impl Iterator for SimpleUbloxSensor {
     type Item = GeoCoord;
 

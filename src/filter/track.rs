@@ -8,6 +8,11 @@ use std::error::Error;
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
+/// # Explanation
+/// The gaussian state consists of the expected state (vector) and the uncertainty (covariance matrix).
+///
+/// # Type parameters
+/// SD is the dimension of the state (eg four for the constant velocity model).
 #[derive(Debug, Copy, Clone)]
 pub struct GaussianState<const D: usize> {
     x: SVector<f64, D>,
@@ -20,10 +25,16 @@ impl<const D: usize> GaussianState<D> {
     }
 }
 
+/// # Explanation
+/// A waypoint is a position the object has been at a specific time (or at least that is what we assume).
+/// In order to make smoothing and plotting easier the waypoint also contains the measurement and the prediction.
+///
+/// # Type parameters
+/// SD is the dimension of the state (eg four for the constant velocity model). MD is the dimension
+/// of the measurement vectors.
 #[derive(Debug, Copy, Clone)]
 pub struct Waypoint<const SD: usize, const MD: usize> {
     timestamp: Instant,
-    #[allow(dead_code)]
     measurement: SVector<f64, MD>,
     #[allow(dead_code)]
     prediction: GaussianState<SD>,
@@ -46,6 +57,15 @@ impl<const SD: usize, const MD: usize> Waypoint<SD, MD> {
     }
 }
 
+/// # Explanation
+/// The KalmanTrack is a track where each incoming measurement is filtered with a kalman filter.
+/// It consists of a transition model and a measurement model.
+///
+/// # Type parameters
+/// SD is the dimension of the state (eg four for the constant velocity model). MD is the dimension
+/// of the measurement vectors (the measurement needs to be converted into a vector in order to be
+/// processable). The type M is the type of the incoming measurements (it needs to be convertable to a vector so that
+/// the kalman filter can work with it).
 pub struct KalmanTrack<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> {
     transition_model: LinearTransitionModel<SD>,
     measurement_model: LinearMeasurementModel<SD, MD>,
@@ -73,6 +93,9 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
         }
     }
 
+    /// # Explanation
+    /// This function adds a new measurement to the track.
+    /// Before it is added to the track, it is filtered by a kalman filter.
     pub fn new_measurement(&mut self, measurement: M) {
         let timestamp = Instant::now();
         let prior = self.track.last().unwrap();
@@ -88,6 +111,9 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
         self.track.push(waypoint);
     }
 
+    /// # Explanation
+    /// This function predicts the next state based on the prior state, the time that has passed and
+    /// the transition model.
     fn predict(&self, dt: Duration, prior: &GaussianState<SD>) -> GaussianState<SD> {
         let transition_matrix = self.transition_model.transition_matrix(dt);
         let transition_error = self.transition_model.transition_error(dt);
@@ -98,6 +124,9 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
         )
     }
 
+    /// # Explanation
+    /// This function performs a filter operation on the prediction with the given measurement
+    /// and the measurement model.
     fn filter(
         &self,
         prediction: &GaussianState<SD>,
@@ -119,6 +148,16 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
         )
     }
 
+    /// # Explanation
+    /// This function plots the track to a file with the given filename. The measurements are plotted in
+    /// red and the filtered track is plotted in the color green.
+    ///
+    /// # Type parameters
+    /// TRACK_X is the index of the x-axis in the state vector.
+    /// TRACK_Y is the index of the y-axis in the state vector.
+    ///
+    /// MEAS_X is the index of the x-axis in the measurement vector.
+    /// MEAS_Y is the index of the y-axis in the measurement vector.
     pub fn plot_track<
         const TRACK_X: usize,
         const TRACK_Y: usize,
@@ -174,6 +213,8 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
         Ok(())
     }
 
+    /// # Explanation
+    /// This function computes the min and max of the elements at the given index of state vectors in the track.
     fn min_max_with_index<const INDEX: usize>(&self) -> Option<(f64, f64)> {
         let min = self.track.iter().min_by(|waypoint1, waypoint2| {
             Self::cmp_f64(

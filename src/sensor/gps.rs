@@ -1,6 +1,8 @@
 use nalgebra::{Matrix3, SVector, Vector3};
 use nmea::sentences::RmcData;
 
+/// # Explanation
+/// The GeoCoord struct represents a geographical coordinate (consisting of longitude and latitude).
 #[derive(Debug, Copy, Clone)]
 pub struct GeoCoord {
     pub lon: f64,
@@ -30,6 +32,8 @@ impl GeoCoord {
     }
 }
 
+/// # Explanation
+/// The Cartesian2D struct represents a point in a cartesian coordinate system with two dimensions.
 #[derive(Debug, Copy, Clone)]
 pub struct Cartesian2D {
     pub x: f64,
@@ -42,12 +46,17 @@ impl Cartesian2D {
     }
 }
 
+/// # Explanation
+/// Since the Cartesian2D struct should be used in a KalmanTrack it needs to be convertable to a vector.
 impl Into<SVector<f64, 2>> for Cartesian2D {
     fn into(self) -> SVector<f64, 2> {
         SVector::<f64, 2>::new(self.x, self.y)
     }
 }
 
+/// # Explanation
+/// The GeoToECEF struct is used to convert geographic coordinates (longitude and latitude) to cartesian coordinates
+/// with the ECEF method. Since we ignore the height coordinate we set it to 0 in the process.
 pub struct GeoToECEF;
 
 impl GeoToECEF {
@@ -72,6 +81,9 @@ impl GeoToECEF {
     }
 }
 
+/// # Explanation
+/// The GeoToENU struct is used to convert geographic coordinates (longitude and latitude) to cartesian coordinates
+/// with the ENU method. Since we ignore the height coordinate we set it to 0 in the process.
 pub struct GeoToENU {
     base_point: Cartesian2D,
     rotation_matrix: Matrix3<f64>,
