@@ -151,10 +151,6 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
     /// This function performs the smooth operation on the track based on the retrodiction formulas
     /// of the kalman filter.
     pub fn smooth(&mut self) {
-        if self.track.len() == 0 {
-            return;
-        }
-
         // The loop goes in reversed order of the track and updates the ith waypoint with the i+1th waypoint
         // based on the kalman filter formulas.
         let len = self.track.len();
