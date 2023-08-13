@@ -173,49 +173,31 @@ where
     /// # Explanation
     /// This function performs the smooth operation on the track based on the retrodiction formulas
     /// of the kalman filter.
-    pub fn smooth(&self) -> Option<Self> {
-        if self.track.len() == 0 {
-            None
-        } else {
-            let mut smoothed_track: Vec<Waypoint<STATE_DIM, MEAS_DIM>> =
-                vec![*self.track.last().unwrap()];
+    pub fn smooth(&mut self) {
+        // The loop goes in reversed order of the track and updates the ith waypoint with the i+1th waypoint
+        // based on the kalman filter formulas.
+        let len = self.track.len();
+        for i in (1..=len - 1).rev() {
+            let (waypoints, subsq_waypoints) = self.track.split_at_mut(i);
+            let waypoint = &mut waypoints[i - 1];
+            let subsq_waypoint = &subsq_waypoints[0];
 
-            // The loop goes in reversed order of the track and updates the ith waypoint with the i+1th waypoint
-            // based on the kalman filter formulas.
-            for waypoint in self.track.iter().rev().skip(1) {
-                // subsq_waypoint is the waypoint that came after the current waypoint
-                let subsq_waypoint = smoothed_track.last().unwrap();
+            let dt = subsq_waypoint.timestamp - waypoint.timestamp;
+            let transition_matrix = self.transition_model.transition_matrix(dt);
 
-                let dt = subsq_waypoint.timestamp - waypoint.timestamp;
-                let transition_matrix = self.transition_model.transition_matrix(dt);
+            let kalman_gain = waypoint.estimate.covar
+                * transition_matrix.transpose()
+                * subsq_waypoint.prediction.covar.try_inverse().unwrap(); // maybe later pseudo inverse
 
-                let kalman_gain = waypoint.estimate.covar
-                    * transition_matrix.transpose()
-                    * subsq_waypoint.prediction.covar.try_inverse().unwrap(); // maybe later pseudo inverse
+            let x_smoothed = waypoint.estimate.x
+                + kalman_gain * (subsq_waypoint.estimate.x - subsq_waypoint.prediction.x);
+            let covar_smoothed = waypoint.estimate.covar
+                + kalman_gain
+                    * (subsq_waypoint.estimate.covar - subsq_waypoint.prediction.covar)
+                    * kalman_gain.transpose();
 
-                // updating the state and the covariance
-                let smoothed_x = waypoint.estimate.x
-                    + kalman_gain * (subsq_waypoint.estimate.x - subsq_waypoint.prediction.x);
-                let smoothed_covar = waypoint.estimate.covar
-                    + kalman_gain
-                        * (subsq_waypoint.estimate.covar - subsq_waypoint.prediction.covar)
-                        * kalman_gain.transpose();
-
-                let smoothed_estimate = GaussianState::new(smoothed_x, smoothed_covar);
-                let smoothed_waypoint = Waypoint::new(
-                    waypoint.timestamp,
-                    waypoint.measurement,
-                    waypoint.prediction,
-                    smoothed_estimate,
-                );
-                smoothed_track.insert(0, smoothed_waypoint);
-            }
-
-            Some(KalmanTrack::from_track(
-                self.measurement_model.clone(),
-                self.transition_model.clone(),
-                smoothed_track,
-            ))
+            waypoint.estimate.x = x_smoothed;
+            waypoint.estimate.covar = covar_smoothed;
         }
     }
 
