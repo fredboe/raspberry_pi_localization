@@ -70,6 +70,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             track
                 .plot_track::<0, 1, 0, 1>("track.png")
                 .log_err_unwrap(());
+            std::thread::sleep(Duration::from_secs(1));
             std::process::exit(0);
         }
 

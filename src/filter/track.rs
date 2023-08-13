@@ -153,16 +153,13 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
     pub fn smooth(&mut self) {
         // The loop goes in reversed order of the track and updates the ith waypoint with the i+1th waypoint
         // based on the kalman filter formulas.
-        log::info!("Smooth");
         let len = self.track.len();
         for i in (1..=len - 1).rev() {
-            log::info!("{}", i);
             let (waypoints, subsq_waypoints) = self.track.split_at_mut(i);
             let waypoint = &mut waypoints[i - 1];
             let subsq_waypoint = &subsq_waypoints[0];
 
             let dt = subsq_waypoint.timestamp - waypoint.timestamp;
-            log::info!("{}", dt.as_secs_f64());
             let transition_matrix = self.transition_model.transition_matrix(dt);
 
             let kalman_gain = waypoint.estimate.covar
