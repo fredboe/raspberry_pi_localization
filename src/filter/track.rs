@@ -97,8 +97,8 @@ impl<const STATE_DIM: usize, const MEAS_DIM: usize, M, TransModel, MeasModel>
     KalmanTrack<STATE_DIM, MEAS_DIM, M, TransModel, MeasModel>
 where
     M: Into<SVector<f64, MEAS_DIM>>,
-    TransModel: LinearTransitionModel<STATE_DIM> + Clone,
-    MeasModel: LinearMeasurementModel<STATE_DIM, MEAS_DIM> + Clone,
+    TransModel: LinearTransitionModel<STATE_DIM>,
+    MeasModel: LinearMeasurementModel<STATE_DIM, MEAS_DIM>,
 {
     pub fn new(
         initial_state: GaussianState<STATE_DIM>,

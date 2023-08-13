@@ -57,6 +57,8 @@ fn run() -> Result<(), Box<dyn Error>> {
             ConstantVelocity::new(0.05),
         );
 
+    println!("The robot is now drivable.");
+
     for _ in GameLoop::from_fps(15) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
 
