@@ -64,7 +64,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");
-            track.smooth();
+            // track.smooth();
             track
                 .plot_track::<0, 1, 0, 1>("track.png")
                 .log_err_unwrap(());
