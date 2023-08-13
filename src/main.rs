@@ -47,6 +47,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut follow_joystick = FollowJoystick::new();
 
     let initial_state = get_initial_state_for_constant_velocity(&mut gps_sensor);
+    log::info!("Initial state: {:?}", initial_state);
     let mut track: KalmanTrack<4, 2, Cartesian2D> = KalmanTrack::new(
         initial_state,
         x_y_measurement_model(1.5, 1.5),
