@@ -98,23 +98,18 @@ where
         }
     }
 
-    fn from_track(
-        measurement_model: MeasModel,
-        transition_model: TransModel,
-        track: Vec<Waypoint<STATE_DIM, MEAS_DIM>>,
-    ) -> Self {
-        KalmanTrack {
-            measurement_model,
-            transition_model,
-            track,
-            _phantom: PhantomData::default(),
-        }
+    /// # Explanation
+    /// This function resets the current track so that the track consists only of the given initial state.
+    #[allow(dead_code)]
+    pub fn reset(&mut self, initial_state: Waypoint<STATE_DIM, MEAS_DIM>) {
+        self.track = vec![initial_state];
     }
 
     /// # Explanation
     /// This function adds a new measurement to the track.
     /// Before it is added to the track, it is filtered by a kalman filter.
     pub fn new_measurement(&mut self, measurement: M) {
+        // later return a result
         if self.track.len() == 0 {
             return;
         }
@@ -174,10 +169,10 @@ where
     /// This function performs the smooth operation on the track based on the retrodiction formulas
     /// of the kalman filter.
     pub fn smooth(&mut self) {
+        // later return a result
         // The loop goes in reversed order of the track and updates the ith waypoint with the i+1th waypoint
         // based on the kalman filter formulas.
-        let len = self.track.len();
-        for i in (1..=len - 1).rev() {
+        for i in (1..=self.track.len().saturating_sub(1)).rev() {
             let (waypoints, subsq_waypoints) = self.track.split_at_mut(i);
             let waypoint = &mut waypoints[i - 1];
             let subsq_waypoint = &subsq_waypoints[0];
