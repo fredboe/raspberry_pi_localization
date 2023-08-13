@@ -22,7 +22,11 @@ impl Utils {
                 re.find(data_string.as_str())
                     .map(|rmc_match| rmc_match.as_str().to_string())
             })
-            .and_then(|rmc_string| nmea::parse_str(rmc_string.as_str()).ok());
+            .and_then(|rmc_string| {
+                let parsed = nmea::parse_str(rmc_string.as_str());
+                log::info!("Parsed data from gps sensor: {:?}", parsed);
+                parsed.ok()
+            });
 
         match parse_result {
             Some(ParseResult::RMC(rmc_data)) => Some(rmc_data),
