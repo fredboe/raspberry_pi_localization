@@ -7,6 +7,7 @@ use simplelog::{Config, WriteLogger};
 use std::error::Error;
 use std::fmt::Display;
 use std::str::FromStr;
+use std::time::{Duration, Instant};
 
 pub struct Utils;
 
@@ -34,13 +35,14 @@ impl Utils {
     /// This function asks the gps sensor permanently for the position and once a position is given
     /// it is returned.
     pub fn get_base_point<GPS: Iterator<Item = GeoCoord>>(gps_sensor: &mut GPS) -> GeoCoord {
-        let initial_position = loop {
+        for _ in GameLoop::from_fps(1000) {
             if let Some(position) = gps_sensor.next() {
-                break position;
+                return position;
             }
-        };
+        }
 
-        initial_position
+        // this will not be reached
+        GeoCoord::new(0., 0.)
     }
 
     /// # Explanation
@@ -73,5 +75,42 @@ impl<T, E: Display> LogErrUnwrap<T> for Result<T, E> {
             log::error!("{}", e);
             default
         })
+    }
+}
+
+pub struct GameLoop {
+    current_frame_start: Instant,
+    duration_per_frame: Duration,
+}
+
+impl GameLoop {
+    pub fn new(duration_per_frame: Duration) -> GameLoop {
+        let current_frame_start = Instant::now();
+        GameLoop {
+            current_frame_start,
+            duration_per_frame,
+        }
+    }
+
+    pub fn from_fps(fps: u16) -> GameLoop {
+        let duration_per_frame = Duration::from_secs_f32(1.0 / (fps as f32));
+        Self::new(duration_per_frame)
+    }
+}
+
+impl Iterator for GameLoop {
+    type Item = ();
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let end_time = self.current_frame_start + self.duration_per_frame;
+        while Instant::now() < end_time {
+            let sleep_time = end_time - Instant::now();
+            std::thread::sleep(sleep_time);
+        }
+
+        let next_frame_start_time = Instant::now();
+        self.current_frame_start = next_frame_start_time;
+
+        Some(())
     }
 }
