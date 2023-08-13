@@ -49,7 +49,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let initial_state = get_initial_state_for_constant_velocity(&mut gps_sensor);
     let mut track: KalmanTrack<4, 2, Cartesian2D> = KalmanTrack::new(
         initial_state,
-        x_y_measurement_model(1., 1.),
+        x_y_measurement_model(1.5, 1.5),
         constant_velocity(0.05),
     );
 
@@ -65,6 +65,11 @@ fn run() -> Result<(), Box<dyn Error>> {
             log::info!("Plotting the track.");
             track
                 .plot_track::<0, 1, 0, 1>("track.png")
+                .log_err_unwrap(());
+
+            track.smooth();
+            track
+                .plot_track::<0, 1, 0, 1>("track_smoothed.png")
                 .log_err_unwrap(());
         }
 

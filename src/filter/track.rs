@@ -36,9 +36,8 @@ impl<const D: usize> GaussianState<D> {
 pub struct Waypoint<const SD: usize, const MD: usize> {
     timestamp: Instant,
     measurement: SVector<f64, MD>,
-    #[allow(dead_code)]
     prediction: GaussianState<SD>,
-    expectation: GaussianState<SD>,
+    estimate: GaussianState<SD>,
 }
 
 impl<const SD: usize, const MD: usize> Waypoint<SD, MD> {
@@ -46,13 +45,13 @@ impl<const SD: usize, const MD: usize> Waypoint<SD, MD> {
         timestamp: Instant,
         measurement: SVector<f64, MD>,
         prediction: GaussianState<SD>,
-        expectation: GaussianState<SD>,
+        estimate: GaussianState<SD>,
     ) -> Self {
         Waypoint {
             timestamp,
             measurement,
             prediction,
-            expectation,
+            estimate,
         }
     }
 }
@@ -101,7 +100,7 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
         let prior = self.track.last().unwrap();
         let dt = timestamp - prior.timestamp;
 
-        let prediction = self.predict(dt, &prior.expectation);
+        let prediction = self.predict(dt, &prior.estimate);
 
         let measurement_vector = measurement.into();
         let expectation = self.filter(&prediction, &measurement_vector);
@@ -146,6 +145,41 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
             prediction.x + kalman_gain * nu,
             prediction.covar - kalman_gain * s * kalman_gain.transpose(),
         )
+    }
+
+    /// # Explanation
+    /// This function performs the smooth operation on the track based on the retrodiction formulas
+    /// of the kalman filter.
+    pub fn smooth(&mut self) {
+        if self.track.len() == 0 {
+            return;
+        }
+
+        // The loop goes in reversed order of the track and updates the ith waypoint with the i+1th waypoint
+        // based on the kalman filter formulas.
+        let len = self.track.len();
+        for i in (1..=len - 1).rev() {
+            let (waypoints, subsq_waypoints) = self.track.split_at_mut(i);
+            let waypoint = &mut waypoints[i - 1];
+            let subsq_waypoint = &subsq_waypoints[0];
+
+            let dt = subsq_waypoint.timestamp - waypoint.timestamp;
+            let transition_matrix = self.transition_model.transition_matrix(dt);
+
+            let kalman_gain = waypoint.estimate.covar
+                * transition_matrix.transpose()
+                * subsq_waypoint.prediction.covar.try_inverse().unwrap(); // maybe later pseudo inverse
+
+            let x_smoothed = waypoint.estimate.x
+                + kalman_gain * (subsq_waypoint.estimate.x - subsq_waypoint.prediction.x);
+            let covar_smoothed = waypoint.estimate.covar
+                + kalman_gain
+                    * (subsq_waypoint.estimate.covar - subsq_waypoint.prediction.covar)
+                    * kalman_gain.transpose();
+
+            waypoint.estimate.x = x_smoothed;
+            waypoint.estimate.covar = covar_smoothed;
+        }
     }
 
     /// # Explanation
@@ -199,12 +233,9 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
 
         // Draw the track
         chart.draw_series(LineSeries::new(
-            self.track.iter().map(|waypoint| {
-                (
-                    waypoint.expectation.x[TRACK_X],
-                    waypoint.expectation.x[TRACK_Y],
-                )
-            }),
+            self.track
+                .iter()
+                .map(|waypoint| (waypoint.estimate.x[TRACK_X], waypoint.estimate.x[TRACK_Y])),
             &GREEN,
         ))?;
 
@@ -217,23 +248,17 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
     /// This function computes the min and max of the elements at the given index of state vectors in the track.
     fn min_max_with_index<const INDEX: usize>(&self) -> Option<(f64, f64)> {
         let min = self.track.iter().min_by(|waypoint1, waypoint2| {
-            Self::cmp_f64(
-                waypoint1.expectation.x[INDEX],
-                waypoint2.expectation.x[INDEX],
-            )
+            Self::cmp_f64(waypoint1.estimate.x[INDEX], waypoint2.estimate.x[INDEX])
         });
 
         let max = self.track.iter().max_by(|waypoint1, waypoint2| {
-            Self::cmp_f64(
-                waypoint1.expectation.x[INDEX],
-                waypoint2.expectation.x[INDEX],
-            )
+            Self::cmp_f64(waypoint1.estimate.x[INDEX], waypoint2.estimate.x[INDEX])
         });
 
         match (min, max) {
             (Some(waypoint_min), Some(waypoint_max)) => Some((
-                waypoint_min.expectation.x[INDEX],
-                waypoint_max.expectation.x[INDEX],
+                waypoint_min.estimate.x[INDEX],
+                waypoint_max.estimate.x[INDEX],
             )),
             _ => None,
         }
