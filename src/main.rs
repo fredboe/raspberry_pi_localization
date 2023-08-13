@@ -7,7 +7,7 @@ use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{LogErrUnwrap, Utils};
 use gilrs::Button;
 use nalgebra::{SMatrix, SVector};
-use raspberry_pi_localization::filter::model::{constant_velocity, x_y_measurement_model};
+use raspberry_pi_localization::filter::model::{ConstantVelocity, XYMeasurementModel};
 use raspberry_pi_localization::filter::track::{GaussianState, KalmanTrack};
 use std::error::Error;
 use std::time::{Duration, Instant};
@@ -38,23 +38,24 @@ fn main() -> Result<(), Box<dyn Error>> {
 /// Then for every "frame" in the game loop the user input is retrieved; the gps sensor is asked for
 /// the position which is then added to the track and in the end the action the decider returned is executed.
 fn run() -> Result<(), Box<dyn Error>> {
+    let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60)?;
+    let mut user_input_unit = UserInputUnit::new()?;
+    let mut follow_joystick = FollowJoystick::new();
+
     let gps_error = 2.5;
     let mut gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?;
     let base_point = Utils::get_base_point(&mut gps_sensor);
     let cartesian_converter = GeoToENU::new(base_point);
     let mut gps_sensor = gps_sensor.map(move |geo_coord| cartesian_converter.convert(geo_coord));
 
-    let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60)?;
-    let mut user_input_unit = UserInputUnit::new()?;
-    let mut follow_joystick = FollowJoystick::new();
-
     let initial_state = GaussianState::<4>::new(SVector::zeros(), gps_error * SMatrix::identity());
     log::info!("Initial state: {:?}", initial_state);
-    let mut track: KalmanTrack<4, 2, Cartesian2D> = KalmanTrack::new(
-        initial_state,
-        x_y_measurement_model(gps_error, gps_error),
-        constant_velocity(0.05),
-    );
+    let mut track: KalmanTrack<4, 2, Cartesian2D, ConstantVelocity, XYMeasurementModel<4>> =
+        KalmanTrack::new(
+            initial_state,
+            XYMeasurementModel::new(gps_error, gps_error),
+            ConstantVelocity::new(0.05),
+        );
 
     for _ in GameLoop::from_fps(15) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
@@ -66,11 +67,13 @@ fn run() -> Result<(), Box<dyn Error>> {
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");
-            // track.smooth();
             track
                 .plot_track::<0, 1, 0, 1>("track.png")
                 .log_err_unwrap(());
-            std::process::exit(0);
+            let smoothed_track = track.smooth().unwrap();
+            smoothed_track
+                .plot_track::<0, 1, 0, 1>("track_smoothed.png")
+                .log_err_unwrap(());
         }
 
         let action = follow_joystick.decide(&user_input);

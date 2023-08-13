@@ -65,18 +65,24 @@ impl<const SD: usize, const MD: usize> Waypoint<SD, MD> {
 /// of the measurement vectors (the measurement needs to be converted into a vector in order to be
 /// processable). The type M is the type of the incoming measurements (it needs to be convertable to a vector so that
 /// the kalman filter can work with it).
-pub struct KalmanTrack<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> {
-    transition_model: LinearTransitionModel<SD>,
-    measurement_model: LinearMeasurementModel<SD, MD>,
-    track: Vec<Waypoint<SD, MD>>,
+pub struct KalmanTrack<const STATE_DIM: usize, const MEAS_DIM: usize, M, TransModel, MeasModel> {
+    transition_model: TransModel,
+    measurement_model: MeasModel,
+    track: Vec<Waypoint<STATE_DIM, MEAS_DIM>>,
     _phantom: PhantomData<M>,
 }
 
-impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD, MD, M> {
+impl<const STATE_DIM: usize, const MEAS_DIM: usize, M, TransModel, MeasModel>
+    KalmanTrack<STATE_DIM, MEAS_DIM, M, TransModel, MeasModel>
+where
+    M: Into<SVector<f64, MEAS_DIM>>,
+    TransModel: LinearTransitionModel<STATE_DIM> + Clone,
+    MeasModel: LinearMeasurementModel<STATE_DIM, MEAS_DIM> + Clone,
+{
     pub fn new(
-        initial_state: GaussianState<SD>,
-        measurement_model: LinearMeasurementModel<SD, MD>,
-        transition_model: LinearTransitionModel<SD>,
+        initial_state: GaussianState<STATE_DIM>,
+        measurement_model: MeasModel,
+        transition_model: TransModel,
     ) -> Self {
         let track = vec![Waypoint::new(
             Instant::now(),
@@ -92,10 +98,27 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
         }
     }
 
+    fn from_track(
+        measurement_model: MeasModel,
+        transition_model: TransModel,
+        track: Vec<Waypoint<STATE_DIM, MEAS_DIM>>,
+    ) -> Self {
+        KalmanTrack {
+            measurement_model,
+            transition_model,
+            track,
+            _phantom: PhantomData::default(),
+        }
+    }
+
     /// # Explanation
     /// This function adds a new measurement to the track.
     /// Before it is added to the track, it is filtered by a kalman filter.
     pub fn new_measurement(&mut self, measurement: M) {
+        if self.track.len() == 0 {
+            return;
+        }
+
         let timestamp = Instant::now();
         let prior = self.track.last().unwrap();
         let dt = timestamp - prior.timestamp;
@@ -103,9 +126,9 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
         let prediction = self.predict(dt, &prior.estimate);
 
         let measurement_vector = measurement.into();
-        let expectation = self.filter(&prediction, &measurement_vector);
+        let estimate = self.filter(&prediction, &measurement_vector);
 
-        let waypoint = Waypoint::new(timestamp, measurement_vector, prediction, expectation);
+        let waypoint = Waypoint::new(timestamp, measurement_vector, prediction, estimate);
 
         self.track.push(waypoint);
     }
@@ -113,7 +136,7 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
     /// # Explanation
     /// This function predicts the next state based on the prior state, the time that has passed and
     /// the transition model.
-    fn predict(&self, dt: Duration, prior: &GaussianState<SD>) -> GaussianState<SD> {
+    fn predict(&self, dt: Duration, prior: &GaussianState<STATE_DIM>) -> GaussianState<STATE_DIM> {
         let transition_matrix = self.transition_model.transition_matrix(dt);
         let transition_error = self.transition_model.transition_error(dt);
 
@@ -128,14 +151,14 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
     /// and the measurement model.
     fn filter(
         &self,
-        prediction: &GaussianState<SD>,
-        measurement: &SVector<f64, MD>,
-    ) -> GaussianState<SD> {
+        prediction: &GaussianState<STATE_DIM>,
+        measurement: &SVector<f64, MEAS_DIM>,
+    ) -> GaussianState<STATE_DIM> {
         let measurement_matrix = self.measurement_model.measurement_matrix();
         let measurement_error = self.measurement_model.measurement_error();
 
         let nu = measurement - measurement_matrix * prediction.x;
-        let s: SMatrix<f64, MD, MD> =
+        let s: SMatrix<f64, MEAS_DIM, MEAS_DIM> =
             measurement_matrix * prediction.covar * measurement_matrix.transpose()
                 + measurement_error;
         let kalman_gain =
@@ -150,31 +173,49 @@ impl<const SD: usize, const MD: usize, M: Into<SVector<f64, MD>>> KalmanTrack<SD
     /// # Explanation
     /// This function performs the smooth operation on the track based on the retrodiction formulas
     /// of the kalman filter.
-    pub fn smooth(&mut self) {
-        // The loop goes in reversed order of the track and updates the ith waypoint with the i+1th waypoint
-        // based on the kalman filter formulas.
-        let len = self.track.len();
-        for i in (1..=len - 1).rev() {
-            let (waypoints, subsq_waypoints) = self.track.split_at_mut(i);
-            let waypoint = &mut waypoints[i - 1];
-            let subsq_waypoint = &subsq_waypoints[0];
+    pub fn smooth(&self) -> Option<Self> {
+        if self.track.len() == 0 {
+            None
+        } else {
+            let mut smoothed_track: Vec<Waypoint<STATE_DIM, MEAS_DIM>> =
+                vec![*self.track.last().unwrap()];
 
-            let dt = subsq_waypoint.timestamp - waypoint.timestamp;
-            let transition_matrix = self.transition_model.transition_matrix(dt);
+            // The loop goes in reversed order of the track and updates the ith waypoint with the i+1th waypoint
+            // based on the kalman filter formulas.
+            for waypoint in self.track.iter().rev().skip(1) {
+                // subsq_waypoint is the waypoint that came after the current waypoint
+                let subsq_waypoint = smoothed_track.last().unwrap();
 
-            let kalman_gain = waypoint.estimate.covar
-                * transition_matrix.transpose()
-                * subsq_waypoint.prediction.covar.try_inverse().unwrap(); // maybe later pseudo inverse
+                let dt = subsq_waypoint.timestamp - waypoint.timestamp;
+                let transition_matrix = self.transition_model.transition_matrix(dt);
 
-            let x_smoothed = waypoint.estimate.x
-                + kalman_gain * (subsq_waypoint.estimate.x - subsq_waypoint.prediction.x);
-            let covar_smoothed = waypoint.estimate.covar
-                + kalman_gain
-                    * (subsq_waypoint.estimate.covar - subsq_waypoint.prediction.covar)
-                    * kalman_gain.transpose();
+                let kalman_gain = waypoint.estimate.covar
+                    * transition_matrix.transpose()
+                    * subsq_waypoint.prediction.covar.try_inverse().unwrap(); // maybe later pseudo inverse
 
-            waypoint.estimate.x = x_smoothed;
-            waypoint.estimate.covar = covar_smoothed;
+                // updating the state and the covariance
+                let smoothed_x = waypoint.estimate.x
+                    + kalman_gain * (subsq_waypoint.estimate.x - subsq_waypoint.prediction.x);
+                let smoothed_covar = waypoint.estimate.covar
+                    + kalman_gain
+                        * (subsq_waypoint.estimate.covar - subsq_waypoint.prediction.covar)
+                        * kalman_gain.transpose();
+
+                let smoothed_estimate = GaussianState::new(smoothed_x, smoothed_covar);
+                let smoothed_waypoint = Waypoint::new(
+                    waypoint.timestamp,
+                    waypoint.measurement,
+                    waypoint.prediction,
+                    smoothed_estimate,
+                );
+                smoothed_track.insert(0, smoothed_waypoint);
+            }
+
+            Some(KalmanTrack::from_track(
+                self.measurement_model.clone(),
+                self.transition_model.clone(),
+                smoothed_track,
+            ))
         }
     }
 

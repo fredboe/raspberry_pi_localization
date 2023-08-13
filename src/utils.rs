@@ -31,8 +31,8 @@ impl Utils {
     }
 
     /// # Explanation
-    /// This function asks the gps sensor for the position and then sets the position of the initial state
-    /// to the returned position and the velocity of the initial state to 0.
+    /// This function asks the gps sensor permanently for the position and once a position is given
+    /// it is returned.
     pub fn get_base_point<GPS: Iterator<Item = GeoCoord>>(gps_sensor: &mut GPS) -> GeoCoord {
         let initial_position = loop {
             if let Some(position) = gps_sensor.next() {

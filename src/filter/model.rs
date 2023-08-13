@@ -3,101 +3,74 @@ use std::time::Duration;
 
 /// # Explanation
 /// The LinearTransitionModel should contain the transition model (so the transition matrix and the error matrix).
-/// Since the time that has passed determines the transition matrix and the error matrix, the struct
-/// consists of two fields that are functions of the form Duration -> Matrix.
+/// Since the time that has passed determines the transition matrix and the error matrix, the delta time
+/// is passed as an argument.
 ///
 /// # Type parameters
 /// SD is the dimension of the state (eg four for the constant velocity model).
-pub struct LinearTransitionModel<const D: usize> {
-    transition_supplier: Box<dyn Fn(Duration) -> SMatrix<f64, D, D>>,
-    error_supplier: Box<dyn Fn(Duration) -> SMatrix<f64, D, D>>,
-}
-
-impl<const D: usize> LinearTransitionModel<D> {
-    pub fn new(
-        transition_supplier: Box<dyn Fn(Duration) -> SMatrix<f64, D, D>>,
-        error_supplier: Box<dyn Fn(Duration) -> SMatrix<f64, D, D>>,
-    ) -> Self {
-        LinearTransitionModel {
-            transition_supplier,
-            error_supplier,
-        }
-    }
-
+pub trait LinearTransitionModel<const D: usize> {
     /// # Returns
     /// Returns the transition matrix when dt is the time that has passed since the last
     /// measurement.
-    pub fn transition_matrix(&self, dt: Duration) -> SMatrix<f64, D, D> {
-        (self.transition_supplier)(dt)
-    }
+    fn transition_matrix(&self, dt: Duration) -> SMatrix<f64, D, D>;
 
     /// # Returns
     /// Returns the error matrix when dt is the time that has passed since the last
     /// measurement.
-    pub fn transition_error(&self, dt: Duration) -> SMatrix<f64, D, D> {
-        (self.error_supplier)(dt)
-    }
-}
-
-/// # Explanation
-/// The LinearMeasurementModel consists of two fields. The measurement matrix that transforms the state
-/// into the measurement space and the measurement error.
-///
-/// # Type parameters
-/// SD is the dimension of the state (eg four for the constant velocity model). MD is the dimension
-/// of the measurement vectors.
-pub struct LinearMeasurementModel<const SD: usize, const MD: usize> {
-    measurement_matrix: SMatrix<f64, MD, SD>,
-    measurement_error: SMatrix<f64, MD, MD>,
-}
-
-impl<const SD: usize, const MD: usize> LinearMeasurementModel<SD, MD> {
-    pub fn new(
-        measurement_matrix: SMatrix<f64, MD, SD>,
-        measurement_error: SMatrix<f64, MD, MD>,
-    ) -> Self {
-        LinearMeasurementModel {
-            measurement_matrix,
-            measurement_error,
-        }
-    }
-
-    /// # Returns
-    /// Returns the measurement matrix.
-    pub fn measurement_matrix(&self) -> SMatrix<f64, MD, SD> {
-        self.measurement_matrix
-    }
-
-    /// # Returns
-    /// Returns the measurement error.
-    pub fn measurement_error(&self) -> SMatrix<f64, MD, MD> {
-        self.measurement_error
-    }
+    fn transition_error(&self, dt: Duration) -> SMatrix<f64, D, D>;
 }
 
 /// # Explanation
 /// The constant velocity transition model assumes that the object moves with a constant velocity.
 /// The state vector consists of four dimensions (x, y, vx, vy).
-pub fn constant_velocity(q: f64) -> LinearTransitionModel<4> {
-    LinearTransitionModel::new(
-        Box::new(|dt| {
-            let dt = dt.as_secs_f64();
-            SMatrix::<f64, 4, 4>::new(
-                1., 0., dt, 0., 0., 1., 0., dt, 0., 0., 1., 0., 0., 0., 0., 1.,
-            )
-        }),
-        Box::new(move |dt| {
-            let dt = dt.as_secs_f64();
+#[derive(Copy, Clone)]
+pub struct ConstantVelocity {
+    q: f64,
+}
 
-            let pow4 = dt.powi(4) / 4.;
-            let pow3 = dt.powi(3) / 2.;
-            let pow2 = dt.powi(2);
+impl ConstantVelocity {
+    pub fn new(q: f64) -> Self {
+        ConstantVelocity { q }
+    }
+}
 
-            q * SMatrix::<f64, 4, 4>::new(
+impl LinearTransitionModel<4> for ConstantVelocity {
+    fn transition_matrix(&self, dt: Duration) -> SMatrix<f64, 4, 4> {
+        let dt = dt.as_secs_f64();
+        SMatrix::<f64, 4, 4>::new(
+            1., 0., dt, 0., 0., 1., 0., dt, 0., 0., 1., 0., 0., 0., 0., 1.,
+        )
+    }
+
+    fn transition_error(&self, dt: Duration) -> SMatrix<f64, 4, 4> {
+        let dt = dt.as_secs_f64();
+
+        let pow4 = dt.powi(4) / 4.;
+        let pow3 = dt.powi(3) / 2.;
+        let pow2 = dt.powi(2);
+
+        self.q
+            * SMatrix::<f64, 4, 4>::new(
                 pow4, 0., pow3, 0., 0., pow4, 0., pow3, pow3, 0., pow2, 0., 0., pow3, 0., pow2,
             )
-        }),
-    )
+    }
+}
+
+/// # Explanation
+/// The measurement matrix that transforms the state into the measurement space.
+/// The measurement error represents the possible error that a measurement can have.
+///
+/// # Type parameters
+/// SD is the dimension of the state (eg four for the constant velocity model). MD is the dimension
+/// of the measurement vectors.
+pub trait LinearMeasurementModel<const SD: usize, const MD: usize> {
+    /// # Returns
+    /// Returns the measurement matrix.
+    fn measurement_matrix(&self) -> SMatrix<f64, MD, SD>;
+
+    /// # Returns
+    /// Returns the measurement error.
+    fn measurement_error(&self) -> SMatrix<f64, MD, MD>;
 }
 
 /// # Explanation
@@ -109,12 +82,24 @@ pub fn constant_velocity(q: f64) -> LinearTransitionModel<4> {
 /// The error_y parameter represents the uncertainty in the y-axis.
 ///
 /// SD is the dimension of the state vectors.
-pub fn x_y_measurement_model<const SD: usize>(
+#[derive(Copy, Clone)]
+pub struct XYMeasurementModel<const SD: usize> {
     error_x: f64,
     error_y: f64,
-) -> LinearMeasurementModel<SD, 2> {
-    LinearMeasurementModel::new(
-        SMatrix::<f64, 2, SD>::identity(),
-        SMatrix::<f64, 2, 2>::new(error_x, 0., 0., error_y),
-    )
+}
+
+impl<const SD: usize> XYMeasurementModel<SD> {
+    pub fn new(error_x: f64, error_y: f64) -> Self {
+        XYMeasurementModel { error_x, error_y }
+    }
+}
+
+impl<const SD: usize> LinearMeasurementModel<SD, 2> for XYMeasurementModel<SD> {
+    fn measurement_matrix(&self) -> SMatrix<f64, 2, SD> {
+        SMatrix::<f64, 2, SD>::identity()
+    }
+
+    fn measurement_error(&self) -> SMatrix<f64, 2, 2> {
+        SMatrix::<f64, 2, 2>::new(self.error_x, 0., 0., self.error_y)
+    }
 }
