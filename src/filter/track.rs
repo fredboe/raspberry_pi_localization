@@ -5,6 +5,7 @@ use plotters::prelude::{
 };
 use std::cmp::Ordering;
 use std::error::Error;
+use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 use std::time::{Duration, Instant};
 
@@ -55,6 +56,26 @@ impl<const SD: usize, const MD: usize> Waypoint<SD, MD> {
         }
     }
 }
+
+#[derive(Debug)]
+pub enum KalmanError {
+    InversionFailure,
+    NotInitialized,
+}
+
+impl Display for KalmanError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            KalmanError::InversionFailure => write!(f, "The matrix inversion failed."),
+            KalmanError::NotInitialized => write!(
+                f,
+                "In order to add a measurement the track needs to have an initial state."
+            ),
+        }
+    }
+}
+
+impl Error for KalmanError {}
 
 /// # Explanation
 /// The KalmanTrack is a track where each incoming measurement is filtered with a kalman filter.
@@ -108,24 +129,24 @@ where
     /// # Explanation
     /// This function adds a new measurement to the track.
     /// Before it is added to the track, it is filtered by a kalman filter.
-    pub fn new_measurement(&mut self, measurement: M) {
-        // later return a result
+    pub fn new_measurement(&mut self, measurement: M) -> Result<(), KalmanError> {
         if self.track.len() == 0 {
-            return;
+            Err(KalmanError::NotInitialized)
+        } else {
+            let timestamp = Instant::now();
+            let prior = self.track.last().unwrap();
+            let dt = timestamp - prior.timestamp;
+
+            let prediction = self.predict(dt, &prior.estimate);
+
+            let measurement_vector = measurement.into();
+            let estimate = self.filter(&prediction, &measurement_vector)?;
+
+            let waypoint = Waypoint::new(timestamp, measurement_vector, prediction, estimate);
+
+            self.track.push(waypoint);
+            Ok(())
         }
-
-        let timestamp = Instant::now();
-        let prior = self.track.last().unwrap();
-        let dt = timestamp - prior.timestamp;
-
-        let prediction = self.predict(dt, &prior.estimate);
-
-        let measurement_vector = measurement.into();
-        let estimate = self.filter(&prediction, &measurement_vector);
-
-        let waypoint = Waypoint::new(timestamp, measurement_vector, prediction, estimate);
-
-        self.track.push(waypoint);
     }
 
     /// # Explanation
@@ -148,7 +169,7 @@ where
         &self,
         prediction: &GaussianState<STATE_DIM>,
         measurement: &SVector<f64, MEAS_DIM>,
-    ) -> GaussianState<STATE_DIM> {
+    ) -> Result<GaussianState<STATE_DIM>, KalmanError> {
         let measurement_matrix = self.measurement_model.measurement_matrix();
         let measurement_error = self.measurement_model.measurement_error();
 
@@ -156,20 +177,20 @@ where
         let s: SMatrix<f64, MEAS_DIM, MEAS_DIM> =
             measurement_matrix * prediction.covar * measurement_matrix.transpose()
                 + measurement_error;
-        let kalman_gain =
-            prediction.covar * measurement_matrix.transpose() * s.try_inverse().unwrap(); // maybe later use the pseudo inverse
+        let kalman_gain = prediction.covar
+            * measurement_matrix.transpose()
+            * s.try_inverse().ok_or(KalmanError::InversionFailure)?;
 
-        GaussianState::new(
+        Ok(GaussianState::new(
             prediction.x + kalman_gain * nu,
             prediction.covar - kalman_gain * s * kalman_gain.transpose(),
-        )
+        ))
     }
 
     /// # Explanation
     /// This function performs the smooth operation on the track based on the retrodiction formulas
     /// of the kalman filter.
-    pub fn smooth(&mut self) {
-        // later return a result
+    pub fn smooth(&mut self) -> Result<(), KalmanError> {
         // The loop goes in reversed order of the track and updates the ith waypoint with the i+1th waypoint
         // based on the kalman filter formulas.
         for i in (1..=self.track.len().saturating_sub(1)).rev() {
@@ -182,7 +203,11 @@ where
 
             let kalman_gain = waypoint.estimate.covar
                 * transition_matrix.transpose()
-                * subsq_waypoint.prediction.covar.try_inverse().unwrap(); // maybe later pseudo inverse
+                * subsq_waypoint
+                    .prediction
+                    .covar
+                    .try_inverse()
+                    .ok_or(KalmanError::InversionFailure)?;
 
             let x_smoothed = waypoint.estimate.x
                 + kalman_gain * (subsq_waypoint.estimate.x - subsq_waypoint.prediction.x);
@@ -194,6 +219,8 @@ where
             waypoint.estimate.x = x_smoothed;
             waypoint.estimate.covar = covar_smoothed;
         }
+
+        Ok(())
     }
 
     /// # Explanation

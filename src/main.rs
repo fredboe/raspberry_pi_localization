@@ -62,7 +62,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
         gps_sensor.next().map(|coords| {
             log::info!("Adding {:?} to the track.", coords);
-            track.new_measurement(coords)
+            track.new_measurement(coords).log_err_unwrap(())
         });
 
         if user_input.is_pressed(Button::East) {
@@ -70,7 +70,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             track
                 .plot_track::<0, 1, 0, 1>("track.png")
                 .log_err_unwrap(());
-            track.smooth();
+            track.smooth().log_err_unwrap(());
             track
                 .plot_track::<0, 1, 0, 1>("track_smoothed.png")
                 .log_err_unwrap(());
