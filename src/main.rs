@@ -38,19 +38,21 @@ fn main() -> Result<(), Box<dyn Error>> {
 /// Then for every "frame" in the game loop the user input is retrieved; the gps sensor is asked for
 /// the position which is then added to the track and in the end the action the decider returned is executed.
 fn run() -> Result<(), Box<dyn Error>> {
-    let cartesian_converter = GeoToENU::new(Utils::get_base_point()?);
-    let mut gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?
-        .map(move |geo_coord| cartesian_converter.convert(geo_coord));
+    let gps_error = 2.5;
+    let mut gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?;
+    let base_point = Utils::get_base_point(&mut gps_sensor);
+    let cartesian_converter = GeoToENU::new(base_point);
+    let mut gps_sensor = gps_sensor.map(move |geo_coord| cartesian_converter.convert(geo_coord));
 
     let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60)?;
     let mut user_input_unit = UserInputUnit::new()?;
     let mut follow_joystick = FollowJoystick::new();
 
-    let initial_state = get_initial_state_for_constant_velocity(&mut gps_sensor);
+    let initial_state = GaussianState::<4>::new(SVector::zeros(), gps_error * SMatrix::identity());
     log::info!("Initial state: {:?}", initial_state);
     let mut track: KalmanTrack<4, 2, Cartesian2D> = KalmanTrack::new(
         initial_state,
-        x_y_measurement_model(1.5, 1.5),
+        x_y_measurement_model(gps_error, gps_error),
         constant_velocity(0.05),
     );
 
@@ -111,22 +113,4 @@ impl Iterator for GameLoop {
 
         Some(())
     }
-}
-
-/// # Explanation
-/// This function asks the gps sensor for the position and then sets the position of the initial state
-/// to the returned position and the velocity of the initial state to 0.
-fn get_initial_state_for_constant_velocity<GPS: Iterator<Item = Cartesian2D>>(
-    gps_sensor: &mut GPS,
-) -> GaussianState<4> {
-    let initial_position = loop {
-        if let Some(position) = gps_sensor.next() {
-            break position;
-        }
-    };
-
-    GaussianState::new(
-        SVector::<f64, 4>::new(initial_position.x, initial_position.y, 0., 0.),
-        SMatrix::<f64, 4, 4>::identity(),
-    )
 }

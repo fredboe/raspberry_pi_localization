@@ -6,7 +6,6 @@ use regex::Regex;
 use simplelog::{Config, WriteLogger};
 use std::error::Error;
 use std::fmt::Display;
-use std::io::ErrorKind;
 use std::str::FromStr;
 
 pub struct Utils;
@@ -50,17 +49,16 @@ impl Utils {
     }
 
     /// # Explanation
-    /// The get_base_point function reads the BASE_POINT environment variable and tries to parse it to
-    /// geographic coordinates (longitude and latitude). The environment variable should contain a tuple
-    /// of two floats (eg. (1.123, 60.907)).
-    pub fn get_base_point() -> Result<GeoCoord, Box<dyn Error>> {
-        let base_point_arg = std::env::var("BASE_POINT")?;
-        let (lon, lat) =
-            Utils::parse_str_to_float_tuple(&base_point_arg).ok_or(std::io::Error::new(
-                ErrorKind::InvalidInput,
-                "The BASE_POINT var should be a tuple of floats.",
-            ))?;
-        Ok(GeoCoord::new(lon, lat))
+    /// This function asks the gps sensor for the position and then sets the position of the initial state
+    /// to the returned position and the velocity of the initial state to 0.
+    pub fn get_base_point<GPS: Iterator<Item = GeoCoord>>(gps_sensor: &mut GPS) -> GeoCoord {
+        let initial_position = loop {
+            if let Some(position) = gps_sensor.next() {
+                break position;
+            }
+        };
+
+        initial_position
     }
 
     /// # Explanation
