@@ -119,23 +119,11 @@ impl Iterator for GameLoop {
 fn get_initial_state_for_constant_velocity<GPS: Iterator<Item = Cartesian2D>>(
     gps_sensor: &mut GPS,
 ) -> GaussianState<4> {
-    let mut num_measurements = 0;
-    let mut initial_position = Cartesian2D::new(0., 0.);
-
-    while num_measurements < 10 {
-        let position = gps_sensor.next();
-        if let Some(position) = position {
-            initial_position = Cartesian2D::new(
-                initial_position.x + position.x,
-                initial_position.y + position.y,
-            );
-            num_measurements += 1;
+    let initial_position = loop {
+        if let Some(position) = gps_sensor.next() {
+            break position;
         }
-    }
-    initial_position = Cartesian2D::new(
-        initial_position.x / (num_measurements as f64),
-        initial_position.y / (num_measurements as f64),
-    );
+    };
 
     GaussianState::new(
         SVector::<f64, 4>::new(initial_position.x, initial_position.y, 0., 0.),
