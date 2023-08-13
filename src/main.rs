@@ -67,10 +67,10 @@ fn run() -> Result<(), Box<dyn Error>> {
                 .plot_track::<0, 1, 0, 1>("track.png")
                 .log_err_unwrap(());
 
-            track.smooth();
+            /*track.smooth();
             track
                 .plot_track::<0, 1, 0, 1>("track_smoothed.png")
-                .log_err_unwrap(());
+                .log_err_unwrap(());*/
         }
 
         let action = follow_joystick.decide(&user_input);
