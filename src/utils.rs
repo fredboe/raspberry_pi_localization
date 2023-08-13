@@ -12,24 +12,6 @@ pub struct Utils;
 
 impl Utils {
     /// # Explanation
-    /// This function takes a string and tries to parse it to a tuple of two floats (f64, f64).
-    pub fn parse_str_to_float_tuple(s: &str) -> Option<(f64, f64)> {
-        let re = Regex::new("\\((?P<num1>.+),\\s*(?P<num2>.+)\\)").unwrap();
-
-        let parse_result = re.captures(s).map(|caps| {
-            (
-                caps["num1"].parse::<f64>().ok(),
-                caps["num2"].parse::<f64>().ok(),
-            )
-        });
-
-        match parse_result {
-            Some((Some(x), Some(y))) => Some((x, y)),
-            _ => None,
-        }
-    }
-
-    /// # Explanation
     /// This function parses the given buffer to the RMC format.
     pub fn parse_to_rmc(data: Vec<u8>) -> Option<RmcData> {
         let re = Regex::new(r"\$.{0,2}RMC.{0,100}\r\n").unwrap();
