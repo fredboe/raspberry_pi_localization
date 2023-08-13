@@ -70,6 +70,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             track
                 .plot_track::<0, 1, 0, 1>("track.png")
                 .log_err_unwrap(());
+            std::process::exit(0);
         }
 
         let action = follow_joystick.decide(&user_input);
