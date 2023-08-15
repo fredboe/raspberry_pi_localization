@@ -42,7 +42,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut user_input_unit = UserInputUnit::new()?;
     let mut follow_joystick = FollowJoystick::new();
 
-    let gps_error = 2.5;
+    let gps_error = 3.;
     let mut gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?;
     let base_point = Utils::get_base_point(&mut gps_sensor);
     let cartesian_converter = GeoToENU::new(base_point);
@@ -59,7 +59,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     println!("The robot is now drivable.");
 
-    for _ in GameLoop::from_fps(15) {
+    for _ in GameLoop::from_fps(100) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
 
         gps_sensor.next().map(|coords| {
