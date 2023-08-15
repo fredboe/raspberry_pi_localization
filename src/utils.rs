@@ -103,11 +103,12 @@ impl Iterator for GameLoop {
 
     fn next(&mut self) -> Option<Self::Item> {
         let end_time = self.current_frame_start + self.duration_per_frame;
-        if Instant::now() < end_time {
+        let now = Instant::now();
+        if now <= end_time {
             let sleep_time = end_time - Instant::now();
             std::thread::sleep(sleep_time);
         } else {
-            log::warn!("The game loop is hanging behind.");
+            log::warn!("The game loop is hanging behind by {:?}.", now - end_time);
         }
 
         let next_frame_start_time = Instant::now();
