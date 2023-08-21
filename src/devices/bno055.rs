@@ -44,9 +44,9 @@ impl BNO055 {
         let az: i16 = 0;
 
         Ok(Vector3::<f64>::new(
-            ax as f64 / QUANTIZATION,
-            ay as f64 / QUANTIZATION,
-            az as f64 / QUANTIZATION,
+            Self::higher_pass_filter(ax as f64 / QUANTIZATION),
+            Self::higher_pass_filter(ay as f64 / QUANTIZATION),
+            Self::higher_pass_filter(az as f64 / QUANTIZATION),
         ))
     }
 
@@ -88,6 +88,15 @@ impl BNO055 {
         );
 
         Ok(acceleration)
+    }
+
+    fn higher_pass_filter(val: f64) -> f64 {
+        const FILTER_VALUE: f64 = 0.1;
+        if val <= FILTER_VALUE {
+            0.
+        } else {
+            val
+        }
     }
 
     fn read_reg(&mut self, reg_num: u8) -> Result<u8, LinuxI2CError> {
