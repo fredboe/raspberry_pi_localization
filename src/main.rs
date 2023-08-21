@@ -93,7 +93,7 @@ fn initialize_velocity_sensor() -> Result<ParSampler<Velocity>, Box<dyn Error>> 
     let bno055 = BNO055::new(0x28)?;
     let velocity_sensor = AccelerationToVelocity::new(bno055);
 
-    Ok(ParSampler::new(30, velocity_sensor))
+    Ok(ParSampler::new(100, velocity_sensor))
 }
 
 fn initialize_kalman_track(

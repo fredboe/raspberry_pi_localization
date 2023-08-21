@@ -110,7 +110,6 @@ impl<Sensor: Iterator<Item = Acceleration>> Iterator for AccelerationToVelocity<
 
             // Trapezoidal Rule
             let dv = 0.5 * dt * (new_acceleration + prev_acceleration);
-            let dv = dt * new_acceleration;
 
             self.velocity = Velocity::from(prev_velocity + dv);
             self.last_moment = moment;
