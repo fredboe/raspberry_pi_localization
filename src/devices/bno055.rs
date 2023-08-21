@@ -39,8 +39,11 @@ impl BNO055 {
     fn read_linear_acceleration(&mut self) -> Result<Vector3<f64>, LinuxI2CError> {
         const QUANTIZATION: f64 = 100.0;
 
-        let ax = i16::from_be_bytes([self.read_reg(0x29)?, self.read_reg(0x28)?]);
-        let ay = i16::from_be_bytes([self.read_reg(0x2B)?, self.read_reg(0x2A)?]);
+        let mut acc_buffer = [0u8; 4];
+        self.read(0x28, &mut acc_buffer)?;
+
+        let ax = i16::from_be_bytes([acc_buffer[1], acc_buffer[0]]);
+        let ay = i16::from_be_bytes([acc_buffer[3], acc_buffer[2]]);
         let az: i16 = 0;
 
         Ok(Vector3::<f64>::new(
@@ -53,10 +56,13 @@ impl BNO055 {
     fn read_orientation_as_quaternion(&mut self) -> Result<Quaternion<f64>, LinuxI2CError> {
         const QUANTIZATION: f64 = 16384.0; // 2^14
 
-        let w = i16::from_be_bytes([self.read_reg(0x21)?, self.read_reg(0x20)?]);
-        let x = i16::from_be_bytes([self.read_reg(0x23)?, self.read_reg(0x22)?]);
-        let y = i16::from_be_bytes([self.read_reg(0x25)?, self.read_reg(0x24)?]);
-        let z = i16::from_be_bytes([self.read_reg(0x27)?, self.read_reg(0x26)?]);
+        let mut quat_buffer = [0u8; 8];
+        self.read(0x20, &mut quat_buffer)?;
+
+        let w = i16::from_be_bytes([quat_buffer[1], quat_buffer[0]]);
+        let x = i16::from_be_bytes([quat_buffer[3], quat_buffer[2]]);
+        let y = i16::from_be_bytes([quat_buffer[5], quat_buffer[4]]);
+        let z = i16::from_be_bytes([quat_buffer[7], quat_buffer[6]]);
 
         Ok(Quaternion::new(
             w as f64 / QUANTIZATION,
@@ -99,6 +105,14 @@ impl BNO055 {
         }
     }
 
+    fn read(&mut self, reg_start: u8, buffer: &mut [u8]) -> Result<(), LinuxI2CError> {
+        self.i2c_device.write(&[reg_start])?;
+        self.i2c_device.read(buffer)?;
+
+        Ok(())
+    }
+
+    /*
     fn read_reg(&mut self, reg_num: u8) -> Result<u8, LinuxI2CError> {
         let mut buffer = [0u8];
 
@@ -107,6 +121,7 @@ impl BNO055 {
 
         Ok(buffer[0])
     }
+    */
 
     /*
     fn write_reg(&mut self, reg_num: u8, value: u8) -> Result<(), LinuxI2CError> {
