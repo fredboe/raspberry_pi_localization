@@ -3,6 +3,7 @@ use i2cdev::core::I2CDevice;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
 use nalgebra::{Quaternion, Vector3};
 use std::error::Error;
+use std::time::Duration;
 
 pub struct BNO055 {
     i2c_device: LinuxI2CDevice,
@@ -17,6 +18,8 @@ impl BNO055 {
 
         // Reset
         i2c_device.write(&[0x3F, 0x20])?;
+        // Timing because of sensor restart
+        std::thread::sleep(Duration::from_millis(700));
 
         // Normal power mode
         i2c_device.write(&[0x3E, 0x00])?;

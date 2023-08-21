@@ -85,14 +85,14 @@ fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error
     let cartesian_converter = GeoToENU::new(base_point);
     let position_sensor = gps_sensor.map(move |geo_coord| cartesian_converter.convert(geo_coord));
 
-    Ok(ParSampler::new(20, position_sensor))
+    Ok(ParSampler::new(15, position_sensor))
 }
 
 fn initialize_velocity_sensor() -> Result<ParSampler<Velocity>, Box<dyn Error>> {
     let bno055 = BNO055::new(0x28)?;
     let velocity_sensor = AccelerationToVelocity::new(bno055);
 
-    Ok(ParSampler::new(200, velocity_sensor))
+    Ok(ParSampler::new(50, velocity_sensor))
 }
 
 fn initialize_kalman_track(

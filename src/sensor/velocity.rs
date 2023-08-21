@@ -101,7 +101,6 @@ impl<Sensor: Iterator<Item = Acceleration>> Iterator for AccelerationToVelocity<
     fn next(&mut self) -> Option<Self::Item> {
         self.acceleration_sensor.next().map(|acc| {
             let moment = Moment::new(acc);
-            log::info!("The moment: {:?}", moment);
 
             let dt = (moment.timestamp - self.last_moment.timestamp).as_secs_f64();
 
