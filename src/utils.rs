@@ -7,6 +7,8 @@ use simplelog::{Config, WriteLogger};
 use std::error::Error;
 use std::fmt::Display;
 use std::str::FromStr;
+use std::sync::mpsc::{Receiver, Sender};
+use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
 pub struct Utils;
@@ -92,7 +94,7 @@ impl GameLoop {
         }
     }
 
-    pub fn from_fps(fps: u16) -> GameLoop {
+    pub fn from_fps(fps: usize) -> GameLoop {
         let duration_per_frame = Duration::from_secs_f32(1.0 / (fps as f32));
         Self::new(duration_per_frame)
     }
@@ -115,5 +117,65 @@ impl Iterator for GameLoop {
         self.current_frame_start = next_frame_start_time;
 
         Some(())
+    }
+}
+
+struct Stop;
+
+pub struct ParSampler<T> {
+    state: Option<T>,
+    stop_sender: Sender<Stop>,
+    state_receiver: Receiver<Option<T>>,
+    handle: Option<JoinHandle<()>>,
+}
+
+impl<T: Send + 'static> ParSampler<T> {
+    pub fn new<IT: Iterator<Item = T> + Send + 'static>(
+        sample_rate: usize,
+        mut iterator: IT,
+    ) -> Self {
+        let (stop_sender, stop_receiver) = std::sync::mpsc::channel();
+        let (state_sender, state_receiver) = std::sync::mpsc::channel();
+
+        let handle = std::thread::spawn(move || {
+            for _ in GameLoop::from_fps(sample_rate) {
+                if stop_receiver.try_recv().is_ok() {
+                    break;
+                }
+
+                let next_state = iterator.next();
+                state_sender.send(next_state).log_err_unwrap(());
+            }
+        });
+
+        ParSampler {
+            state: None,
+            stop_sender,
+            state_receiver,
+            handle: Some(handle),
+        }
+    }
+}
+
+impl<T: Copy + Clone> Iterator for ParSampler<T> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while let Ok(state) = self.state_receiver.try_recv() {
+            self.state = state;
+        }
+
+        self.state.clone()
+    }
+}
+
+impl<T> Drop for ParSampler<T> {
+    fn drop(&mut self) {
+        const ERR_MSG: &str = "ParSampler: Could not terminate the worker thread.";
+        self.stop_sender.send(Stop).expect(ERR_MSG);
+
+        if let Some(handle) = self.handle.take() {
+            handle.join().expect(ERR_MSG);
+        }
     }
 }
