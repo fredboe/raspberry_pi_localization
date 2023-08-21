@@ -4,7 +4,7 @@ use crate::devices::bno055::BNO055;
 use crate::devices::ublox::SimpleUbloxSensor;
 use crate::filter::model::{ConstantVelocity, XYMeasurementModel};
 use crate::filter::track::{GaussianState, KalmanTrack};
-use crate::robot::perform_action;
+use crate::robot::{perform_action, Action};
 use crate::sensor::gps::{Cartesian2D, GeoToENU};
 use crate::sensor::velocity::{AccelerationToVelocity, Velocity};
 use crate::user_input::{UserInput, UserInputUnit};
@@ -70,6 +70,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 .plot_track::<0, 1, 0, 1>("track_smoothed.png")
                 .log_err_unwrap(());
 
+            perform_action(Action::Idle, &mut adafruit_dc_controller).log_err_unwrap(());
             std::process::exit(0);
         }
 
@@ -92,7 +93,7 @@ fn initialize_velocity_sensor() -> Result<ParSampler<Velocity>, Box<dyn Error>> 
     let bno055 = BNO055::new(0x28)?;
     let velocity_sensor = AccelerationToVelocity::new(bno055);
 
-    Ok(ParSampler::new(50, velocity_sensor))
+    Ok(ParSampler::new(30, velocity_sensor))
 }
 
 fn initialize_kalman_track(
