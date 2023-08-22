@@ -104,6 +104,9 @@ impl<const SD: usize> LinearMeasurementModel<SD, 2> for XYMeasurementModel<SD> {
     }
 }
 
+/// # Explanation
+/// The MeasureAllModel assumes that all state variables are also measured (so the measurement matrix is the
+/// identity matrix). The error matrix is a diagonal matrix.
 pub struct MeasureAllModel<const D: usize> {
     measurement_matrix: SMatrix<f64, D, D>,
     measurement_error: SMatrix<f64, D, D>,
