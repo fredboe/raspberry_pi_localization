@@ -1,4 +1,4 @@
-use nalgebra::SMatrix;
+use nalgebra::{SMatrix, SVector};
 use std::time::Duration;
 
 /// # Explanation
@@ -101,5 +101,29 @@ impl<const SD: usize> LinearMeasurementModel<SD, 2> for XYMeasurementModel<SD> {
 
     fn measurement_error(&self) -> SMatrix<f64, 2, 2> {
         SMatrix::<f64, 2, 2>::new(self.error_x, 0., 0., self.error_y)
+    }
+}
+
+pub struct MeasureAllModel<const D: usize> {
+    measurement_matrix: SMatrix<f64, D, D>,
+    measurement_error: SMatrix<f64, D, D>,
+}
+
+impl<const D: usize> MeasureAllModel<D> {
+    pub fn new(diagonal: SVector<f64, D>) -> Self {
+        MeasureAllModel {
+            measurement_matrix: SMatrix::<f64, D, D>::identity(),
+            measurement_error: SMatrix::<f64, D, D>::from_diagonal(&diagonal),
+        }
+    }
+}
+
+impl<const D: usize> LinearMeasurementModel<D, D> for MeasureAllModel<D> {
+    fn measurement_matrix(&self) -> SMatrix<f64, D, D> {
+        self.measurement_matrix
+    }
+
+    fn measurement_error(&self) -> SMatrix<f64, D, D> {
+        self.measurement_error
     }
 }

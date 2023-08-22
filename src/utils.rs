@@ -80,6 +80,9 @@ impl<T, E: Display> LogErrUnwrap<T> for Result<T, E> {
     }
 }
 
+/// # Explanation
+/// The game loop is an iterator that waits when the next function is called if the execution is faster
+/// than the frame rate allows.
 pub struct GameLoop {
     current_frame_start: Instant,
     duration_per_frame: Duration,
@@ -122,6 +125,11 @@ impl Iterator for GameLoop {
 
 struct Stop;
 
+/// # Explanation
+/// The ParSampler struct can be used if an iterator should be called with a specific frame rate on a different thread.
+/// I.e. for a sensor struct that should sample the device with a specific frame rate.
+///
+/// The ParSampler keeps the values as a state so that always the last value the iterator returned can be accessed.
 pub struct ParSampler<T> {
     state: Option<T>,
     stop_sender: Sender<Stop>,
@@ -162,7 +170,9 @@ impl<T: Copy + Clone> Iterator for ParSampler<T> {
 
     fn next(&mut self) -> Option<Self::Item> {
         while let Ok(state) = self.state_receiver.try_recv() {
-            self.state = state;
+            if state.is_some() {
+                self.state = state;
+            }
         }
 
         self.state.clone()

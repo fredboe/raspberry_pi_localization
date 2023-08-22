@@ -102,8 +102,8 @@ where
 {
     pub fn new(
         initial_state: GaussianState<STATE_DIM>,
-        measurement_model: MeasModel,
         transition_model: TransModel,
+        measurement_model: MeasModel,
     ) -> Self {
         let track = vec![Waypoint::new(
             Instant::now(),
@@ -112,8 +112,8 @@ where
             initial_state,
         )];
         KalmanTrack {
-            measurement_model,
             transition_model,
+            measurement_model,
             track,
             _phantom: PhantomData::default(),
         }

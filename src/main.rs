@@ -2,11 +2,11 @@ use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::devices::bno055::BNO055;
 use crate::devices::ublox::SimpleUbloxSensor;
-use crate::filter::model::{ConstantVelocity, XYMeasurementModel};
+use crate::filter::model::{ConstantVelocity, MeasureAllModel, XYMeasurementModel};
 use crate::filter::track::{GaussianState, KalmanTrack};
 use crate::robot::{perform_action, Action};
 use crate::sensor::gps::{Cartesian2D, GeoToENU};
-use crate::sensor::velocity::{AccelerationToVelocity, Velocity};
+use crate::sensor::velocity::{AccelerationToVelocity, KinematicState2D, Velocity2D};
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{GameLoop, LogErrUnwrap, ParSampler, Utils};
 use gilrs::Button;
@@ -40,22 +40,27 @@ fn main() -> Result<(), Box<dyn Error>> {
 /// Then for every "frame" in the game loop the user input is retrieved; the gps sensor is asked for
 /// the position which is then added to the track and in the end the action the decider returned is executed.
 fn run() -> Result<(), Box<dyn Error>> {
+    println!("Starting the initialization...");
+
     let mut adafruit_dc_controller = AdafruitDCStepperHat::new(0x60)?;
     let mut user_input_unit = UserInputUnit::new()?;
     let mut follow_joystick = FollowJoystick::new();
 
     let mut position_sensor = initialize_position_sensor()?;
     let mut velocity_sensor = initialize_velocity_sensor()?;
-    let mut track = initialize_kalman_track();
+    let mut track = initialize_kalman_track_measure_all();
 
     println!("The robot is now drivable.");
 
     for _ in GameLoop::from_fps(20) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
 
-        position_sensor.next().map(|coord| {
-            log::info!("Adding {:?} to the track.", coord);
-            track.new_measurement(coord).log_err_unwrap(())
+        position_sensor.next().and_then(|position| {
+            velocity_sensor.next().map(|velocity| {
+                let measurement = KinematicState2D::new(position, velocity);
+                log::info!("Adding {:?} to the track.", measurement);
+                track.new_measurement(measurement).log_err_unwrap(())
+            })
         });
 
         log::info!("The velocity is: {:?}", velocity_sensor.next());
@@ -89,22 +94,40 @@ fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error
     Ok(ParSampler::new(15, position_sensor))
 }
 
-fn initialize_velocity_sensor() -> Result<ParSampler<Velocity>, Box<dyn Error>> {
+fn initialize_velocity_sensor() -> Result<ParSampler<Velocity2D>, Box<dyn Error>> {
     let bno055 = BNO055::new(0x28)?;
     let velocity_sensor = AccelerationToVelocity::new(bno055);
 
     Ok(ParSampler::new(100, velocity_sensor))
 }
 
-fn initialize_kalman_track(
+fn initialize_kalman_track_xy(
 ) -> KalmanTrack<4, 2, Cartesian2D, ConstantVelocity, XYMeasurementModel<4>> {
     let gps_error = 3.;
     let initial_state = GaussianState::<4>::new(SVector::zeros(), gps_error * SMatrix::identity());
-    log::info!("Initial state: {:?}", initial_state);
     let track = KalmanTrack::new(
         initial_state,
-        XYMeasurementModel::new(gps_error, gps_error),
         ConstantVelocity::new(0.05),
+        XYMeasurementModel::new(gps_error, gps_error),
+    );
+
+    track
+}
+
+fn initialize_kalman_track_measure_all(
+) -> KalmanTrack<4, 4, KinematicState2D, ConstantVelocity, MeasureAllModel<4>> {
+    let gps_error = 3.;
+    let velocity_error = 1.;
+    let initial_state = GaussianState::<4>::new(SVector::zeros(), gps_error * SMatrix::identity());
+    let track = KalmanTrack::new(
+        initial_state,
+        ConstantVelocity::new(0.05),
+        MeasureAllModel::new(SVector::from_column_slice(&[
+            gps_error,
+            gps_error,
+            velocity_error,
+            velocity_error,
+        ])),
     );
 
     track

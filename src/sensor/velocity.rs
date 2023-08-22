@@ -2,76 +2,81 @@ use crate::sensor::gps::Cartesian2D;
 use nalgebra::SVector;
 use std::time::Instant;
 
+/// # Explanation
+/// The KinematicState consists of the position and the velocity of an object.
 #[derive(Debug)]
-pub struct KinematicState {
+pub struct KinematicState2D {
     pub position: Cartesian2D,
-    pub velocity: Velocity,
+    pub velocity: Velocity2D,
 }
 
-impl KinematicState {
-    pub fn new(position: Cartesian2D, velocity: Velocity) -> Self {
-        KinematicState { position, velocity }
+impl KinematicState2D {
+    pub fn new(position: Cartesian2D, velocity: Velocity2D) -> Self {
+        KinematicState2D { position, velocity }
     }
 }
 
-impl Into<SVector<f64, 4>> for KinematicState {
+impl Into<SVector<f64, 4>> for KinematicState2D {
     fn into(self) -> SVector<f64, 4> {
         let Cartesian2D { x, y } = self.position;
-        let Velocity { vx, vy } = self.velocity;
+        let Velocity2D { vx, vy } = self.velocity;
         SVector::<f64, 4>::new(x, y, vx, vy)
     }
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Velocity {
+pub struct Velocity2D {
     pub vx: f64,
     pub vy: f64,
 }
 
-impl Velocity {
+impl Velocity2D {
     pub fn new(vx: f64, vy: f64) -> Self {
-        Velocity { vx, vy }
+        Velocity2D { vx, vy }
     }
 }
 
-impl Into<SVector<f64, 2>> for Velocity {
+impl Into<SVector<f64, 2>> for Velocity2D {
     fn into(self) -> SVector<f64, 2> {
         SVector::<f64, 2>::new(self.vx, self.vy)
     }
 }
 
-impl From<SVector<f64, 2>> for Velocity {
+impl From<SVector<f64, 2>> for Velocity2D {
     fn from(value: SVector<f64, 2>) -> Self {
-        Velocity::new(value[0], value[1])
+        Velocity2D::new(value[0], value[1])
     }
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Acceleration {
+pub struct Acceleration2D {
     pub ax: f64,
     pub ay: f64,
 }
 
-impl Acceleration {
+impl Acceleration2D {
     pub fn new(ax: f64, ay: f64) -> Self {
-        Acceleration { ax, ay }
+        Acceleration2D { ax, ay }
     }
 }
 
-impl Into<SVector<f64, 2>> for Acceleration {
+impl Into<SVector<f64, 2>> for Acceleration2D {
     fn into(self) -> SVector<f64, 2> {
         SVector::<f64, 2>::new(self.ax, self.ay)
     }
 }
 
+/// # Explanation
+/// A moment describes the acceleration of an object at a specific time. So it consists of a timestamp
+/// and the acceleration.
 #[derive(Clone, Debug)]
 pub struct Moment {
     timestamp: Instant,
-    acceleration: Acceleration,
+    acceleration: Acceleration2D,
 }
 
 impl Moment {
-    pub fn new(acceleration: Acceleration) -> Self {
+    pub fn new(acceleration: Acceleration2D) -> Self {
         Moment {
             timestamp: Instant::now(),
             acceleration,
@@ -79,24 +84,27 @@ impl Moment {
     }
 }
 
-pub struct AccelerationToVelocity<Sensor: Iterator<Item = Acceleration>> {
+/// # Explanation
+/// The AccelerationToVelocity takes an iterator that returns accelerations and then integrates over these
+/// to get the velocity. It assumes that the starting velocity and the starting acceleration is 0.
+pub struct AccelerationToVelocity<Sensor: Iterator<Item = Acceleration2D>> {
     last_moment: Moment,
-    velocity: Velocity,
+    velocity: Velocity2D,
     acceleration_sensor: Sensor,
 }
 
-impl<Sensor: Iterator<Item = Acceleration>> AccelerationToVelocity<Sensor> {
+impl<Sensor: Iterator<Item = Acceleration2D>> AccelerationToVelocity<Sensor> {
     pub fn new(sensor: Sensor) -> Self {
         AccelerationToVelocity {
-            last_moment: Moment::new(Acceleration::new(0., 0.)),
-            velocity: Velocity::new(0., 0.),
+            last_moment: Moment::new(Acceleration2D::new(0., 0.)),
+            velocity: Velocity2D::new(0., 0.),
             acceleration_sensor: sensor,
         }
     }
 }
 
-impl<Sensor: Iterator<Item = Acceleration>> Iterator for AccelerationToVelocity<Sensor> {
-    type Item = Velocity;
+impl<Sensor: Iterator<Item = Acceleration2D>> Iterator for AccelerationToVelocity<Sensor> {
+    type Item = Velocity2D;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.acceleration_sensor.next().map(|acc| {
@@ -111,7 +119,7 @@ impl<Sensor: Iterator<Item = Acceleration>> Iterator for AccelerationToVelocity<
             // Trapezoidal Rule
             let dv = 0.5 * dt * (new_acceleration + prev_acceleration);
 
-            self.velocity = Velocity::from(prev_velocity + dv);
+            self.velocity = Velocity2D::from(prev_velocity + dv);
             self.last_moment = moment;
 
             self.velocity
