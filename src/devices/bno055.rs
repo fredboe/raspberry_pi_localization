@@ -50,6 +50,8 @@ impl BNO055 {
         let ay = i16::from_be_bytes([acc_buffer[3], acc_buffer[2]]);
         let az: i16 = 0;
 
+        log::info!("Measured acceleration: {}, {}, {}", ax, ay, az);
+
         Ok(Vector3::<f64>::new(
             Self::higher_pass_filter(ax as f64 / QUANTIZATION),
             Self::higher_pass_filter(ay as f64 / QUANTIZATION),
@@ -67,6 +69,8 @@ impl BNO055 {
         let x = i16::from_be_bytes([quat_buffer[3], quat_buffer[2]]);
         let y = i16::from_be_bytes([quat_buffer[5], quat_buffer[4]]);
         let z = i16::from_be_bytes([quat_buffer[7], quat_buffer[6]]);
+
+        log::info!("Quaternion: {}, {}, {}, {}", w, x, y, z);
 
         Ok(Quaternion::new(
             w as f64 / QUANTIZATION,
