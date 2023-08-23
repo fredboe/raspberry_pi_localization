@@ -2,11 +2,10 @@ use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::devices::bno055::BNO055Compass;
 use crate::devices::ublox::SimpleUbloxSensor;
-use crate::filter::model::{ConstantVelocity, MeasureAllModel, XYMeasurementModel};
+use crate::filter::model::{ConstantVelocity, XYMeasurementModel};
 use crate::filter::track::{GaussianState, KalmanTrack};
 use crate::robot::{perform_action, Action};
 use crate::sensor::gps::{Cartesian2D, GeoToENU};
-use crate::sensor::velocity::KinematicState2D;
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{GameLoop, LogErrUnwrap, ParSampler, Utils};
 use gilrs::Button;
@@ -59,14 +58,8 @@ fn run() -> Result<(), Box<dyn Error>> {
             .next()
             .map(|coord| track.new_measurement(coord).log_err_unwrap(()));
 
-        log::info!(
-            "Quaternion: {:?}",
-            orientation_sensor.read_orientation_as_quaternion()
-        );
-        log::info!(
-            "Euler: {:?}",
-            orientation_sensor.read_orientation_as_euler()
-        );
+        log::info!("Calibrated: {:?}", orientation_sensor.mag_calibrated());
+        log::info!("Euler: {:?}", orientation_sensor.read_heading());
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");
@@ -105,25 +98,6 @@ fn initialize_kalman_track_xy(
         initial_state,
         ConstantVelocity::new(0.05),
         XYMeasurementModel::new(gps_error, gps_error),
-    );
-
-    track
-}
-
-fn initialize_kalman_track_measure_all(
-) -> KalmanTrack<4, 4, KinematicState2D, ConstantVelocity, MeasureAllModel<4>> {
-    let gps_error = 3.;
-    let velocity_error = 1.;
-    let initial_state = GaussianState::<4>::new(SVector::zeros(), gps_error * SMatrix::identity());
-    let track = KalmanTrack::new(
-        initial_state,
-        ConstantVelocity::new(0.05),
-        MeasureAllModel::new(SVector::from_column_slice(&[
-            gps_error,
-            gps_error,
-            velocity_error,
-            velocity_error,
-        ])),
     );
 
     track
