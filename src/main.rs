@@ -47,9 +47,9 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let mut position_sensor = initialize_position_sensor()?;
     let mut orientation_sensor = BNO055Compass::new(0x28)?;
-    println!("Starting the calibration...");
-    orientation_sensor.calibrate()?;
-    println!("Calibrated");
+    orientation_sensor.apply_calibration(&[
+        0, 0, 0, 0, 254, 255, 148, 1, 184, 254, 192, 255, 0, 0, 0, 0, 0, 0, 232, 3, 60, 2,
+    ])?;
     let mut track = initialize_kalman_track_xy();
 
     println!("The robot is now drivable.");
@@ -61,9 +61,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             .next()
             .map(|coord| track.new_measurement(coord).log_err_unwrap(()));
 
-        log::info!("Calibrated: {:?}", orientation_sensor.read_calibrated());
-        println!("Calibrated: {:?}", orientation_sensor.read_calibrated());
-        log::info!("Euler: {:?}", orientation_sensor.read_heading());
+        log::info!("Heading: {:?}", orientation_sensor.read_heading());
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");
