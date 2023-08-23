@@ -22,13 +22,13 @@ impl BNO055Compass {
         Ok(BNO055Compass { i2c_device })
     }
 
-    pub fn mag_calibrated(&mut self) -> Result<bool, LinuxI2CError> {
+    pub fn read_calibrated(&mut self) -> Result<u8, LinuxI2CError> {
         // lower two bits must be 1
-        Ok(self.read_one_reg(0x35)? % 4 == 3)
+        self.read_one_reg(0x35)
     }
 
     pub fn read_heading(&mut self) -> Result<f64, LinuxI2CError> {
-        const QUANTIZATION: f64 = 1000.0;
+        const QUANTIZATION: f64 = 16.0;
 
         let mut heading_buffer = [0u8; 2];
         self.read(0x1A, &mut heading_buffer)?;
