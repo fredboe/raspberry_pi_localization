@@ -16,6 +16,7 @@ impl BNO055Compass {
 
         // Switch to config mode
         i2c_device.write(&[0x3D, 0x00])?;
+        std::thread::sleep(Duration::from_millis(20));
 
         // Reset
         i2c_device.write(&[0x3F, 0x20])?;
@@ -24,15 +25,19 @@ impl BNO055Compass {
 
         // Normal power mode
         i2c_device.write(&[0x3E, 0x00])?;
+        std::thread::sleep(Duration::from_millis(20));
 
         // Switch to page 0
         i2c_device.write(&[0x07, 0x00])?;
+        std::thread::sleep(Duration::from_millis(20));
 
         // Start
         i2c_device.write(&[0x3F, 0x00])?;
+        std::thread::sleep(Duration::from_millis(20));
 
         // Switch to COMPASS mode
         i2c_device.write(&[0x3D, 0x09])?;
+        std::thread::sleep(Duration::from_millis(20));
 
         Ok(BNO055Compass { i2c_device })
     }
