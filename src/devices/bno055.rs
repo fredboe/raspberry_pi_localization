@@ -51,7 +51,12 @@ impl BNO055Compass {
 
             match calibrated {
                 Ok(0xFF) => break,
-                x => println!("Calibrated: {:?}", x),
+                x => {
+                    println!("Calibrated: {:?}", x);
+                    let mut settings_buffer = [0u8; 22];
+                    self.read(0x55, &mut settings_buffer)?;
+                    println!("Settings: {:?}", settings_buffer)
+                }
             }
         }
 
