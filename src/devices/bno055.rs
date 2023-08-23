@@ -55,6 +55,10 @@ impl BNO055Compass {
             }
         }
 
+        let mut settings_buffer = [0u8; 22];
+        self.read(0x55, &mut settings_buffer)?;
+        log::info!("Settings: {:?}", settings_buffer);
+
         Ok(())
     }
 
