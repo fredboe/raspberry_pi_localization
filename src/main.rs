@@ -1,12 +1,12 @@
 use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
-use crate::devices::bno055::BNO055;
+use crate::devices::bno055::BNO055Compass;
 use crate::devices::ublox::SimpleUbloxSensor;
 use crate::filter::model::{ConstantVelocity, MeasureAllModel, XYMeasurementModel};
 use crate::filter::track::{GaussianState, KalmanTrack};
 use crate::robot::{perform_action, Action};
 use crate::sensor::gps::{Cartesian2D, GeoToENU};
-use crate::sensor::velocity::{AccelerationToVelocity, KinematicState2D, Velocity2D};
+use crate::sensor::velocity::KinematicState2D;
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{GameLoop, LogErrUnwrap, ParSampler, Utils};
 use gilrs::Button;
@@ -47,23 +47,21 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut follow_joystick = FollowJoystick::new();
 
     let mut position_sensor = initialize_position_sensor()?;
-    let mut velocity_sensor = initialize_velocity_sensor()?;
-    let mut track = initialize_kalman_track_measure_all();
+    let mut orientation_sensor = BNO055Compass::new(0x28)?;
+    let mut track = initialize_kalman_track_xy();
 
     println!("The robot is now drivable.");
 
     for _ in GameLoop::from_fps(20) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
 
-        position_sensor.next().and_then(|position| {
-            velocity_sensor.next().map(|velocity| {
-                let measurement = KinematicState2D::new(position, velocity);
-                log::info!("Adding {:?} to the track.", measurement);
-                track.new_measurement(measurement).log_err_unwrap(())
-            })
-        });
+        position_sensor
+            .next()
+            .map(|coord| track.new_measurement(coord).log_err_unwrap(()));
 
-        log::info!("The velocity is: {:?}", velocity_sensor.next());
+        orientation_sensor.next().map(|quaternion| {
+            log::info!("Quaternion: {:?}", quaternion);
+        });
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");
@@ -92,13 +90,6 @@ fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error
     let position_sensor = gps_sensor.map(move |geo_coord| cartesian_converter.convert(geo_coord));
 
     Ok(ParSampler::new(15, position_sensor))
-}
-
-fn initialize_velocity_sensor() -> Result<ParSampler<Velocity2D>, Box<dyn Error>> {
-    let bno055 = BNO055::new(0x28)?;
-    let velocity_sensor = AccelerationToVelocity::new(bno055);
-
-    Ok(ParSampler::new(100, velocity_sensor))
 }
 
 fn initialize_kalman_track_xy(
