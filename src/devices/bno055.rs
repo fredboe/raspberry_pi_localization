@@ -1,5 +1,6 @@
 use i2cdev::core::I2CDevice;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
+use std::time::Duration;
 
 /// # Explanation
 /// This is a simple implementation to interact with the BNO055 sensor.
@@ -12,6 +13,20 @@ pub struct BNO055Compass {
 impl BNO055Compass {
     pub fn new(i2c_addr: u16) -> Result<Self, LinuxI2CError> {
         let mut i2c_device = LinuxI2CDevice::new("/dev/i2c-1", i2c_addr)?;
+
+        // Switch to config mode
+        i2c_device.write(&[0x3D, 0x00])?;
+
+        // Reset
+        i2c_device.write(&[0x3F, 0x20])?;
+        // Timing because of sensor restart
+        std::thread::sleep(Duration::from_millis(700));
+
+        // Normal power mode
+        i2c_device.write(&[0x3E, 0x00])?;
+
+        // Switch to page 0
+        i2c_device.write(&[0x07, 0x00])?;
 
         // Start
         i2c_device.write(&[0x3F, 0x00])?;
