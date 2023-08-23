@@ -43,15 +43,19 @@ impl BNO055Compass {
         Ok(BNO055Compass { i2c_device })
     }
 
-    pub fn calibrate(&mut self) {
+    pub fn calibrate(&mut self) -> Result<(), LinuxI2CError> {
+        self.write(0x3D, 0x0A)?;
+
         for _ in GameLoop::from_fps(10) {
             let calibrated = self.read_calibrated();
 
             match calibrated {
-                Ok(0xFF) => return,
+                Ok(0xFF) => break,
                 x => println!("Calibrated: {:?}", x),
             }
         }
+
+        Ok(())
     }
 
     pub fn read_calibrated(&mut self) -> Result<u8, LinuxI2CError> {
@@ -82,6 +86,10 @@ impl BNO055Compass {
         let mut buffer = [0u8; 1];
         self.read(reg, &mut buffer)?;
         Ok(buffer[0])
+    }
+
+    fn write(&mut self, reg: u8, data: u8) -> Result<(), LinuxI2CError> {
+        self.i2c_device.write(&[reg, data])
     }
 }
 
