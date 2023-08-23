@@ -59,6 +59,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             .map(|coord| track.new_measurement(coord).log_err_unwrap(()));
 
         log::info!("Calibrated: {:?}", orientation_sensor.read_calibrated());
+        println!("Calibrated: {:?}", orientation_sensor.read_calibrated());
         log::info!("Euler: {:?}", orientation_sensor.read_heading());
 
         if user_input.is_pressed(Button::East) {
