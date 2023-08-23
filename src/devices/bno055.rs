@@ -44,19 +44,18 @@ impl BNO055Compass {
     }
 
     pub fn calibrate(&mut self) -> Result<(), LinuxI2CError> {
-        self.write(0x3D, 0x0A)?;
+        self.write(0x3D, 0x0C)?;
 
         for _ in GameLoop::from_fps(10) {
-            let calibrated = self.read_calibrated();
+            let calibrated = self.read_calibrated()?;
 
-            match calibrated {
-                Ok(0xFF) => break,
-                x => {
-                    println!("Calibrated: {:?}", x);
-                    let mut settings_buffer = [0u8; 22];
-                    self.read(0x55, &mut settings_buffer)?;
-                    println!("Settings: {:?}", settings_buffer)
-                }
+            if calibrated % 4 == 3 {
+                // Switch to COMPASS mode
+                self.i2c_device.write(&[0x3D, 0x00])?;
+                std::thread::sleep(Duration::from_millis(20));
+                let mut settings_buffer = [0u8; 22];
+                self.read(0x55, &mut settings_buffer)?;
+                println!("Settings: {:?}", settings_buffer)
             }
         }
 
