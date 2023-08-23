@@ -57,6 +57,23 @@ impl BNO055Compass {
         ))
     }
 
+    pub fn read_orientation_as_euler(&mut self) -> Result<(f64, f64, f64), LinuxI2CError> {
+        const QUANTIZATION: f64 = 16.0;
+
+        let mut angle_buffer = [0u8; 6];
+        self.read(0x1A, &mut angle_buffer)?;
+
+        let heading = i16::from_be_bytes([angle_buffer[1], angle_buffer[0]]);
+        let roll = i16::from_be_bytes([angle_buffer[3], angle_buffer[2]]);
+        let pitch = i16::from_be_bytes([angle_buffer[5], angle_buffer[4]]);
+
+        Ok((
+            heading as f64 / QUANTIZATION,
+            roll as f64 / QUANTIZATION,
+            pitch as f64 / QUANTIZATION,
+        ))
+    }
+
     /// # Explanation
     /// This function fills the buffer with the registers of the device starting at the given start registers.
     fn read(&mut self, reg_start: u8, buffer: &mut [u8]) -> Result<(), LinuxI2CError> {

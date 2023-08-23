@@ -59,9 +59,14 @@ fn run() -> Result<(), Box<dyn Error>> {
             .next()
             .map(|coord| track.new_measurement(coord).log_err_unwrap(()));
 
-        orientation_sensor.next().map(|quaternion| {
-            log::info!("Quaternion: {:?}", quaternion);
-        });
+        log::info!(
+            "Quaternion: {:?}",
+            orientation_sensor.read_orientation_as_quaternion()
+        );
+        log::info!(
+            "Euler: {:?}",
+            orientation_sensor.read_orientation_as_euler()
+        );
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");
