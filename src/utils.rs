@@ -48,6 +48,13 @@ impl Utils {
     }
 
     /// # Explanation
+    /// This function returns the bytes of the CALIBRATION environment variable.
+    pub fn get_calibration() -> Result<Vec<u8>, Box<dyn Error>> {
+        let calibration_string = std::env::var("CALIBRATION")?;
+        Ok(calibration_string.into_bytes())
+    }
+
+    /// # Explanation
     /// This function initializes the logger. It reads the RUST_LOG environment variable and sets the log level.
     /// RUST_LOG should be one of error, warn, info, debug or trace (the default is info). The function also
     /// sets the output file to raspberry_pi_localization.log .
