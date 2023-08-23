@@ -50,8 +50,13 @@ impl Utils {
     /// # Explanation
     /// This function returns the bytes of the CALIBRATION environment variable.
     pub fn get_calibration() -> Result<Vec<u8>, Box<dyn Error>> {
-        let calibration_string = std::env::var("CALIBRATION")?;
-        Ok(calibration_string.into_bytes())
+        let calibration_string = std::env::var("ORIENTATION_CALIBRATION")?;
+        let calibration = calibration_string
+            .split(",")
+            .map(|val| val.parse::<u8>().map_err(|e| Box::new(e) as Box<dyn Error>))
+            .collect();
+
+        calibration
     }
 
     /// # Explanation

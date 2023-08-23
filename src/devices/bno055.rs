@@ -1,4 +1,3 @@
-use crate::utils::GameLoop;
 use i2cdev::core::I2CDevice;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
 
