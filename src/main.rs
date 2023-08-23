@@ -47,6 +47,9 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let mut position_sensor = initialize_position_sensor()?;
     let mut orientation_sensor = BNO055Compass::new(0x28)?;
+    println!("Starting the calibration...");
+    orientation_sensor.calibrate();
+    println!("Calibrated");
     let mut track = initialize_kalman_track_xy();
 
     println!("The robot is now drivable.");

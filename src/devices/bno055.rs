@@ -1,3 +1,4 @@
+use crate::utils::GameLoop;
 use i2cdev::core::I2CDevice;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
 use std::time::Duration;
@@ -40,6 +41,17 @@ impl BNO055Compass {
         std::thread::sleep(Duration::from_millis(20));
 
         Ok(BNO055Compass { i2c_device })
+    }
+
+    pub fn calibrate(&mut self) {
+        for _ in GameLoop::from_fps(10) {
+            let calibrated = self.read_calibrated();
+
+            match calibrated {
+                Ok(0xFF) => return,
+                x => println!("Calibrated: {:?}", x),
+            }
+        }
     }
 
     pub fn read_calibrated(&mut self) -> Result<u8, LinuxI2CError> {
