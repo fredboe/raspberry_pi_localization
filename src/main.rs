@@ -50,7 +50,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut position_sensor = initialize_position_sensor()?;
     let mut orientation_sensor = BNO055Compass::new(0x28)?;
     orientation_sensor.apply_calibration(&Utils::get_calibration()?)?;
-    let distance_traveled_sensor = PAA5100::new(0.025)?;
+    let distance_traveled_sensor = PAA5100::new("/dev/spidev0.0", 0.025)?;
     let mut oriented_velocity_sensor =
         OrientedVelocity::new(orientation_sensor, distance_traveled_sensor);
 
