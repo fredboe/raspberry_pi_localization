@@ -1,6 +1,6 @@
 #[cfg(test)]
 mod tests {
-    use raspberry_pi_localization::robot::{perform_action, Action, Directions, MotorController};
+    use raspberry_pi_localization::actions::{perform_action, Action, Directions, MotorController};
     use std::fmt::Error;
 
     struct MockMotorController {

@@ -1,4 +1,4 @@
-use crate::robot::{Directions, MotorController};
+use crate::actions::{Directions, MotorController};
 use i2cdev::core::*;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
 

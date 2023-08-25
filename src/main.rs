@@ -1,21 +1,23 @@
+use crate::actions::{perform_action, Action};
 use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::devices::bno055::BNO055Compass;
+use crate::devices::paa5100::PAA5100;
 use crate::devices::ublox::SimpleUbloxSensor;
 use crate::filter::model::{ConstantVelocity, XYMeasurementModel};
 use crate::filter::track::{GaussianState, KalmanTrack};
-use crate::robot::{perform_action, Action};
 use crate::sensor::gps::{Cartesian2D, GeoToENU};
+use crate::sensor::velocity::OrientedVelocity;
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{GameLoop, LogErrUnwrap, ParSampler, Utils};
 use gilrs::Button;
 use nalgebra::{SMatrix, SVector};
 use std::error::Error;
 
+mod actions;
 mod deciders;
 mod devices;
 mod filter;
-mod robot;
 mod sensor;
 mod user_input;
 mod utils;
@@ -48,6 +50,9 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut position_sensor = initialize_position_sensor()?;
     let mut orientation_sensor = BNO055Compass::new(0x28)?;
     orientation_sensor.apply_calibration(&Utils::get_calibration()?)?;
+    let distance_traveled_sensor = PAA5100::new(0.025)?;
+    let mut oriented_velocity_sensor =
+        OrientedVelocity::new(orientation_sensor, distance_traveled_sensor);
 
     let mut track = initialize_kalman_track_xy();
 
@@ -60,7 +65,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             .next()
             .map(|coord| track.new_measurement(coord).log_err_unwrap(()));
 
-        log::info!("Heading: {:?}", orientation_sensor.read_heading());
+        log::info!("Velocity: {:?}", oriented_velocity_sensor.next());
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");

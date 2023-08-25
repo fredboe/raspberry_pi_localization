@@ -1,5 +1,8 @@
+use crate::sensor::velocity::Orientation;
 use i2cdev::core::I2CDevice;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
+use std::io;
+use std::io::ErrorKind;
 
 /// # Explanation
 /// This is a simple implementation to interact with the BNO055 sensor.
@@ -11,24 +14,35 @@ pub struct BNO055Compass {
 
 impl BNO055Compass {
     pub fn new(i2c_addr: u16) -> Result<Self, LinuxI2CError> {
-        let mut i2c_device = LinuxI2CDevice::new("/dev/i2c-1", i2c_addr)?;
+        let i2c_device = LinuxI2CDevice::new("/dev/i2c-1", i2c_addr)?;
+        let mut bno055 = BNO055Compass { i2c_device };
 
-        // Switch to config mode
-        i2c_device.write(&[0x3D, 0x00])?;
+        if bno055.read_one_reg(0x00)? != 0xA {
+            Err(LinuxI2CError::Io(io::Error::new(
+                ErrorKind::InvalidData,
+                "Wrong chip id.",
+            )))
+        } else {
+            // Switch to config mode
+            bno055.write_one_reg(0x3D, 0x00)?;
 
-        // Normal power mode
-        i2c_device.write(&[0x3E, 0x00])?;
+            // Normal power mode
+            bno055.write_one_reg(0x3E, 0x00)?;
 
-        // Switch to page 0
-        i2c_device.write(&[0x07, 0x00])?;
+            // Switch to page 0
+            bno055.write_one_reg(0x07, 0x00)?;
 
-        // Start
-        i2c_device.write(&[0x3F, 0x00])?;
+            // Set orientation to android and the euler unit to radians
+            bno055.write_one_reg(0x3B, 0x84)?;
 
-        // Switch to COMPASS mode
-        i2c_device.write(&[0x3D, 0x09])?;
+            // Start
+            bno055.write_one_reg(0x3F, 0x00)?;
 
-        Ok(BNO055Compass { i2c_device })
+            // Switch to COMPASS mode
+            bno055.write_one_reg(0x3D, 0x09)?;
+
+            Ok(bno055)
+        }
     }
 
     pub fn apply_calibration(&mut self, calibration_buffer: &[u8]) -> Result<(), LinuxI2CError> {
@@ -37,7 +51,7 @@ impl BNO055Compass {
         self.write_one_reg(0x3D, 0x09)
     }
 
-    pub fn read_heading(&mut self) -> Result<f64, LinuxI2CError> {
+    pub fn read_heading(&mut self) -> Result<Orientation, LinuxI2CError> {
         const QUANTIZATION: f64 = 16.0;
 
         let mut heading_buffer = [0u8; 2];
@@ -45,7 +59,7 @@ impl BNO055Compass {
 
         let heading = i16::from_be_bytes([heading_buffer[1], heading_buffer[0]]);
 
-        Ok(heading as f64 / QUANTIZATION)
+        Ok(Orientation::new(heading as f64 / QUANTIZATION))
     }
 
     /// # Explanation
@@ -72,7 +86,7 @@ impl BNO055Compass {
 }
 
 impl Iterator for BNO055Compass {
-    type Item = f64;
+    type Item = Orientation;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.read_heading().ok()

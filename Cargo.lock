@@ -904,6 +904,7 @@ dependencies = [
  "regex",
  "serialport",
  "simplelog",
+ "spidev",
 ]
 
 [[package]]
@@ -1079,6 +1080,17 @@ dependencies = [
  "log",
  "termcolor",
  "time 0.3.25",
+]
+
+[[package]]
+name = "spidev"
+version = "0.5.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5a204ca68d7f2109ffaf6326b79d8abf0014870625b78c8aff1941a5e4b9ff7d"
+dependencies = [
+ "bitflags",
+ "libc",
+ "nix 0.23.2",
 ]
 
 [[package]]
