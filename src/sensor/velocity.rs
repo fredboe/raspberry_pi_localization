@@ -34,7 +34,7 @@ impl Velocity {
         Velocity { vx, vy }
     }
 
-    pub fn norm(&self) -> f64 {
+    pub fn value(&self) -> f64 {
         (self.vx * self.vx + self.vy * self.vy).sqrt()
     }
 }
@@ -75,8 +75,9 @@ impl<O: Iterator<Item = Orientation>, F: Iterator<Item = Distance>> Iterator
             );
 
             // velocity in global frame (in mm/s)
-            let vx = -v_local.norm() * orientation.radian.sin();
-            let vy = v_local.norm() * orientation.radian.cos();
+            // not entirely sure with this calculation
+            let vx = v_local.value() * orientation.radian.sin();
+            let vy = v_local.value() * orientation.radian.cos();
 
             Some(Velocity::new(vx, vy))
         } else {

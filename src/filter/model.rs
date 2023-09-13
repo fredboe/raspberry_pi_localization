@@ -35,6 +35,11 @@ impl ConstantVelocity {
 }
 
 impl LinearTransitionModel<4> for ConstantVelocity {
+    /// # Returns
+    /// | 1.  0.  dt  0. |<br>
+    /// | 0.  1.  0.  dt |<br>
+    /// | 0.  0.  1.  0. |<br>
+    /// | 0.  0.  0.  1. |<br>
     fn transition_matrix(&self, dt: Duration) -> SMatrix<f64, 4, 4> {
         let dt = dt.as_secs_f64();
         SMatrix::<f64, 4, 4>::new(
@@ -42,6 +47,12 @@ impl LinearTransitionModel<4> for ConstantVelocity {
         )
     }
 
+    /// # Returns
+    /// q *<br>
+    /// | dt^4/4      0   dt^3/2       0 |<br>
+    /// |      0  dt^4/4       0  dt^3/2 |<br>
+    /// | dt^3/2      0  dt^2          0 |<br>
+    /// |     0  dt^3/2       0     dt^2 |<br>
     fn transition_error(&self, dt: Duration) -> SMatrix<f64, 4, 4> {
         let dt = dt.as_secs_f64();
 
