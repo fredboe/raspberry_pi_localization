@@ -49,6 +49,7 @@ impl Utils {
 
     /// # Explanation
     /// This function returns the bytes of the CALIBRATION environment variable.
+    #[allow(dead_code)]
     pub fn get_calibration() -> Result<Vec<u8>, Box<dyn Error>> {
         let calibration_string = std::env::var("ORIENTATION_CALIBRATION")?;
         let calibration = calibration_string
@@ -57,6 +58,14 @@ impl Utils {
             .collect();
 
         calibration
+    }
+
+    /// # Explanation
+    /// This function returns the height env var as a f64.
+    pub fn get_height() -> Result<f64, Box<dyn Error>> {
+        let height_string = std::env::var("HEIGHT")?;
+        let height = height_string.parse::<f64>()?;
+        Ok(height)
     }
 
     /// # Explanation

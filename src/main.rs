@@ -48,11 +48,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut follow_joystick = FollowJoystick::new();
 
     let mut position_sensor = initialize_position_sensor()?;
-    let mut orientation_sensor = BNO055Compass::new(0x28)?;
-    orientation_sensor.apply_calibration(&Utils::get_calibration()?)?;
-    let distance_traveled_sensor = PAA5100::new("/dev/spidev0.0", 0.025)?;
-    let mut oriented_velocity_sensor =
-        OrientedVelocity::new(orientation_sensor, distance_traveled_sensor);
+    let mut velocity_sensor = initialize_velocity_sensor()?;
 
     let mut track = initialize_kalman_track_xy();
 
@@ -65,7 +61,7 @@ fn run() -> Result<(), Box<dyn Error>> {
             .next()
             .map(|coord| track.new_measurement(coord).log_err_unwrap(()));
 
-        log::info!("Velocity: {:?}", oriented_velocity_sensor.next());
+        log::info!("Velocity: {:?}", velocity_sensor.next());
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");
@@ -94,6 +90,18 @@ fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error
     let position_sensor = gps_sensor.map(move |geo_coord| cartesian_converter.convert(geo_coord));
 
     Ok(ParSampler::new(15, position_sensor))
+}
+
+fn initialize_velocity_sensor() -> Result<OrientedVelocity<BNO055Compass, PAA5100>, Box<dyn Error>>
+{
+    let height = Utils::get_height()?;
+    let orientation_sensor = BNO055Compass::new(0x28)?;
+    // orientation_sensor.apply_calibration(&Utils::get_calibration()?)?;
+    let distance_traveled_sensor = PAA5100::new("/dev/spidev0.0", height)?; // currently 27.2mm
+    let oriented_velocity_sensor =
+        OrientedVelocity::new(orientation_sensor, distance_traveled_sensor);
+
+    Ok(oriented_velocity_sensor)
 }
 
 fn initialize_kalman_track_xy(

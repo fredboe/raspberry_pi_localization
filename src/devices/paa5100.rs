@@ -9,8 +9,8 @@ pub struct PAA5100 {
 }
 
 impl PAA5100 {
-    pub fn new(path: &str, height_in_m: f64) -> io::Result<Self> {
-        let mm_per_pixel = height_in_m * 2.13195; // special approximation formula
+    pub fn new(path: &str, height_in_mm: f64) -> io::Result<Self> {
+        let mm_per_pixel = height_in_mm * 0.001 * 2.13195; // special approximation formula
 
         let mut spi = Spidev::open(path)?;
         let options = SpidevOptions::new()
