@@ -45,6 +45,7 @@ impl BNO055Compass {
         }
     }
 
+    #[allow(dead_code)]
     pub fn apply_calibration(&mut self, calibration_buffer: &[u8]) -> Result<(), LinuxI2CError> {
         self.write_one_reg(0x3D, 0x00)?;
         self.write(0x55, calibration_buffer)?;
