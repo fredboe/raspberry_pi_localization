@@ -48,12 +48,12 @@ impl BNO055Compass {
     #[allow(dead_code)]
     pub fn apply_calibration(&mut self, calibration_buffer: &[u8]) -> Result<(), LinuxI2CError> {
         self.write_one_reg(0x3D, 0x00)?;
-        self.write(0x55, calibration_buffer)?;
+        self.write(0x55, &calibration_buffer[0..22])?; // take slice so that only the calibration gets overridden
         self.write_one_reg(0x3D, 0x09)
     }
 
     pub fn read_heading(&mut self) -> Result<Orientation, LinuxI2CError> {
-        const QUANTIZATION: f64 = 16.0;
+        const QUANTIZATION: f64 = 900.0;
 
         let mut heading_buffer = [0u8; 2];
         self.read(0x1A, &mut heading_buffer)?;

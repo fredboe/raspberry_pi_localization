@@ -75,6 +75,7 @@ impl Utils {
     pub fn logger_init() -> Result<(), Box<dyn Error>> {
         let log_level = std::env::var("RUST_LOG").unwrap_or("info".to_string());
         let log_level = LevelFilter::from_str(&log_level).unwrap_or(LevelFilter::Info);
+        println!("Log level: {:?}", log_level);
 
         let log_file = std::fs::File::create("raspberry_pi_localization.log")?;
         WriteLogger::init(log_level, Config::default(), log_file)?;
