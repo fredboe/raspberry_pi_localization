@@ -4,6 +4,7 @@ use std::io;
 use std::io::ErrorKind;
 use std::time::Duration;
 
+#[derive(Debug)]
 pub struct MotionBurst {
     pub delta_x: i16,
     pub delta_y: i16,
@@ -207,6 +208,8 @@ impl Iterator for PAA5100 {
     type Item = Distance; // distance traveled in mm
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.get_distance().ok()
+        let distance = self.get_distance();
+        log::debug!("Distance traveled (PAA5100): {:?}", distance);
+        distance.ok()
     }
 }

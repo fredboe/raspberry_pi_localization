@@ -94,8 +94,8 @@ fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error
 
 fn initialize_velocity_sensor() -> Result<ParSampler<Velocity>, Box<dyn Error>> {
     let height = Utils::get_height()?;
-    let orientation_sensor = BNO055Compass::new(0x28)?;
-    // orientation_sensor.apply_calibration(&Utils::get_calibration()?)?;
+    let mut orientation_sensor = BNO055Compass::new(0x28)?;
+    orientation_sensor.apply_calibration(&Utils::get_calibration()?)?;
     let distance_traveled_sensor = PAA5100::new("/dev/spidev0.1", height)?;
     let oriented_velocity_sensor =
         OrientedVelocity::new(orientation_sensor, distance_traveled_sensor);

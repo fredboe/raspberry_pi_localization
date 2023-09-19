@@ -90,6 +90,8 @@ impl Iterator for BNO055Compass {
     type Item = Orientation;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.read_heading().ok()
+        let heading = self.read_heading();
+        log::debug!("Heading in radian (BNO055): {:?}", heading);
+        heading.ok()
     }
 }

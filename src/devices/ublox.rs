@@ -41,7 +41,11 @@ impl Iterator for SimpleUbloxSensor {
 
     fn next(&mut self) -> Option<Self::Item> {
         let data = self.read_from_device().ok();
-        data.and_then(|data| Utils::parse_to_rmc(data))
-            .and_then(|rmc_data| GeoCoord::from_rmc(rmc_data))
+        let coords = data
+            .and_then(|data| Utils::parse_to_rmc(data))
+            .and_then(|rmc_data| GeoCoord::from_rmc(rmc_data));
+
+        log::debug!("Geographic coordinates (uBlox): {:?}", coords);
+        coords
     }
 }
