@@ -45,7 +45,7 @@ impl Iterator for SimpleUbloxSensor {
             .and_then(|data| Utils::parse_to_rmc(data))
             .and_then(|rmc_data| GeoCoord::from_rmc(rmc_data));
 
-        log::debug!("Geographic coordinates (uBlox): {:?}", coords);
+        log::trace!("Geographic coordinates (uBlox): {:?}", coords);
         coords
     }
 }

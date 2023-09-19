@@ -91,7 +91,7 @@ impl Iterator for BNO055Compass {
 
     fn next(&mut self) -> Option<Self::Item> {
         let heading = self.read_heading();
-        log::debug!("Heading in radian (BNO055): {:?}", heading);
+        log::trace!("Heading in radian (BNO055): {:?}", heading);
         heading.ok()
     }
 }

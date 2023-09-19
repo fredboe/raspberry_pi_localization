@@ -209,7 +209,7 @@ impl Iterator for PAA5100 {
 
     fn next(&mut self) -> Option<Self::Item> {
         let distance = self.get_distance();
-        log::debug!("Distance traveled (PAA5100): {:?}", distance);
+        log::trace!("Distance traveled (PAA5100): {:?}", distance);
         distance.ok()
     }
 }
