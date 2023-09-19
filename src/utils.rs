@@ -186,7 +186,7 @@ impl<T: Send + 'static> ParSampler<T> {
     }
 }
 
-impl<T: Copy + Clone> Iterator for ParSampler<T> {
+impl<T: Clone> Iterator for ParSampler<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {

@@ -7,7 +7,7 @@ use crate::devices::ublox::SimpleUbloxSensor;
 use crate::filter::model::{ConstantVelocity, XYMeasurementModel};
 use crate::filter::track::{GaussianState, KalmanTrack};
 use crate::sensor::gps::{Cartesian2D, GeoToENU};
-use crate::sensor::velocity::OrientedVelocity;
+use crate::sensor::velocity::{OrientedVelocity, Velocity};
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{GameLoop, LogErrUnwrap, ParSampler, Utils};
 use gilrs::Button;
@@ -92,16 +92,15 @@ fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error
     Ok(ParSampler::new(15, position_sensor))
 }
 
-fn initialize_velocity_sensor() -> Result<OrientedVelocity<BNO055Compass, PAA5100>, Box<dyn Error>>
-{
+fn initialize_velocity_sensor() -> Result<ParSampler<Velocity>, Box<dyn Error>> {
     let height = Utils::get_height()?;
     let orientation_sensor = BNO055Compass::new(0x28)?;
     // orientation_sensor.apply_calibration(&Utils::get_calibration()?)?;
-    let distance_traveled_sensor = PAA5100::new("/dev/spidev0.0", height)?; // currently 27.2mm
+    let distance_traveled_sensor = PAA5100::new("/dev/spidev0.1", height)?;
     let oriented_velocity_sensor =
         OrientedVelocity::new(orientation_sensor, distance_traveled_sensor);
 
-    Ok(oriented_velocity_sensor)
+    Ok(ParSampler::new(10, oriented_velocity_sensor))
 }
 
 fn initialize_kalman_track_xy(
