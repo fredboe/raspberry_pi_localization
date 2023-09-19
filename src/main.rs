@@ -80,6 +80,7 @@ fn run() -> Result<(), Box<dyn Error>> {
         let action = follow_joystick.decide(&user_input);
         perform_action(action, &mut adafruit_dc_controller).log_err_unwrap(());
     }
+
     Ok(())
 }
 

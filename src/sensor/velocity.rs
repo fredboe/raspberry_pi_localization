@@ -12,14 +12,14 @@ impl Orientation {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Distance {
+pub struct DistanceMM {
     dx: f64,
     dy: f64,
 }
 
-impl Distance {
+impl DistanceMM {
     pub fn new(dx: f64, dy: f64) -> Self {
-        Distance { dx, dy }
+        DistanceMM { dx, dy }
     }
 }
 
@@ -55,27 +55,26 @@ impl<O, F> OrientedVelocity<O, F> {
     }
 }
 
-impl<O: Iterator<Item = Orientation>, F: Iterator<Item = Distance>> Iterator
+impl<O: Iterator<Item = Orientation>, F: Iterator<Item = DistanceMM>> Iterator
     for OrientedVelocity<O, F>
 {
     type Item = Velocity;
 
     fn next(&mut self) -> Option<Self::Item> {
         let orientation = self.orientation_sensor.next();
-        let distance = self.distance_traveled_sensor.next();
+        let distance_mm = self.distance_traveled_sensor.next();
 
-        if let (Some(orientation), Some(distance)) = (orientation, distance) {
+        if let (Some(orientation), Some(distance_mm)) = (orientation, distance_mm) {
             let now = Instant::now();
             let time_passed = now - self.last_time;
 
             // velocity in local frame
             let v_local = Velocity::new(
-                distance.dx / time_passed.as_secs_f64(),
-                distance.dy / time_passed.as_secs_f64(),
+                distance_mm.dx * 0.001 / time_passed.as_secs_f64(),
+                distance_mm.dy * 0.001 / time_passed.as_secs_f64(),
             );
 
-            // velocity in global frame (in mm/s)
-            // not entirely sure with this calculation
+            // velocity in global frame
             let vx = v_local.value() * orientation.radian.sin();
             let vy = v_local.value() * orientation.radian.cos();
 
