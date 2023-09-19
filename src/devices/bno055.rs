@@ -17,7 +17,7 @@ impl BNO055Compass {
         let i2c_device = LinuxI2CDevice::new("/dev/i2c-1", i2c_addr)?;
         let mut bno055 = BNO055Compass { i2c_device };
 
-        if bno055.read_one_reg(0x00)? != 0xA {
+        if bno055.read_one_reg(0x00)? != 0xA0 {
             Err(LinuxI2CError::Io(io::Error::new(
                 ErrorKind::InvalidData,
                 "Wrong chip id.",
