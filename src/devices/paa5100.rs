@@ -266,7 +266,7 @@ impl PAA5100 {
     }
 
     fn write_one_reg(&mut self, reg: u8, value: u8) -> io::Result<()> {
-        self.read_write(&[reg, value], &mut [0x00, 0x00])?;
+        self.read_write(&[reg | 0x80, value], &mut [0x00, 0x00])?;
         Ok(())
     }
 
