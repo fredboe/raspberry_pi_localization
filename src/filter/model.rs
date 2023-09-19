@@ -123,7 +123,6 @@ pub struct MeasureAllModel<const D: usize> {
     measurement_error: SMatrix<f64, D, D>,
 }
 
-#[allow(dead_code)]
 impl<const D: usize> MeasureAllModel<D> {
     pub fn new(diagonal: SVector<f64, D>) -> Self {
         MeasureAllModel {

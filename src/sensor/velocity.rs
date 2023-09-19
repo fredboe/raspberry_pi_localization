@@ -1,3 +1,5 @@
+use crate::sensor::gps::Cartesian2D;
+use nalgebra::SVector;
 use std::time::Instant;
 
 #[derive(Copy, Clone, Debug)]
@@ -27,6 +29,29 @@ impl DistanceMM {
 pub struct Velocity {
     vx: f64,
     vy: f64,
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct KinematicState {
+    position: Cartesian2D,
+    velocity: Velocity,
+}
+
+impl KinematicState {
+    pub fn new(position: Cartesian2D, velocity: Velocity) -> Self {
+        KinematicState { position, velocity }
+    }
+}
+
+impl Into<SVector<f64, 4>> for KinematicState {
+    fn into(self) -> SVector<f64, 4> {
+        SVector::<f64, 4>::new(
+            self.position.x,
+            self.position.y,
+            self.velocity.vx,
+            self.velocity.vy,
+        )
+    }
 }
 
 impl Velocity {

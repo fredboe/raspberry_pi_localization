@@ -4,14 +4,14 @@ use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::devices::bno055::BNO055Compass;
 use crate::devices::paa5100::PAA5100;
 use crate::devices::ublox::SimpleUbloxSensor;
-use crate::filter::model::{ConstantVelocity, XYMeasurementModel};
+use crate::filter::model::{ConstantVelocity, MeasureAllModel, XYMeasurementModel};
 use crate::filter::track::{GaussianState, KalmanTrack};
 use crate::sensor::gps::{Cartesian2D, GeoToENU};
-use crate::sensor::velocity::{OrientedVelocity, Velocity};
+use crate::sensor::velocity::{KinematicState, OrientedVelocity, Velocity};
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{GameLoop, LogErrUnwrap, ParSampler, Utils};
 use gilrs::Button;
-use nalgebra::{SMatrix, SVector};
+use nalgebra::{SMatrix, SVector, Vector4};
 use std::error::Error;
 
 mod actions;
@@ -47,21 +47,27 @@ fn run() -> Result<(), Box<dyn Error>> {
     let mut user_input_unit = UserInputUnit::new()?;
     let mut follow_joystick = FollowJoystick::new();
 
-    let mut position_sensor = initialize_position_sensor()?;
-    let mut velocity_sensor = initialize_velocity_sensor()?;
+    let position_sensor = initialize_position_sensor()?;
+    let velocity_sensor = initialize_velocity_sensor()?;
+    let mut sensors = position_sensor.zip(velocity_sensor);
 
-    let mut track = initialize_kalman_track_xy();
+    let mut track = initialize_kalman_track_measure_all();
 
     println!("The robot is now drivable.");
 
     for _ in GameLoop::from_fps(20) {
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
 
-        position_sensor
-            .next()
-            .map(|coord| track.new_measurement(coord).log_err_unwrap(()));
-
-        log::info!("Velocity: {:?}", velocity_sensor.next());
+        sensors.next().map(|(position, velocity)| {
+            log::info!(
+                "The robot is at {:?} with a velocity of {:?}.",
+                position,
+                velocity
+            );
+            track
+                .new_measurement(KinematicState::new(position, velocity))
+                .log_err_unwrap(());
+        });
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");
@@ -104,6 +110,7 @@ fn initialize_velocity_sensor() -> Result<ParSampler<Velocity>, Box<dyn Error>> 
     Ok(ParSampler::new(10, oriented_velocity_sensor))
 }
 
+#[allow(dead_code)]
 fn initialize_kalman_track_xy(
 ) -> KalmanTrack<4, 2, Cartesian2D, ConstantVelocity, XYMeasurementModel<4>> {
     let gps_error = 3.;
@@ -112,6 +119,23 @@ fn initialize_kalman_track_xy(
         initial_state,
         ConstantVelocity::new(0.05),
         XYMeasurementModel::new(gps_error, gps_error),
+    );
+
+    track
+}
+
+#[allow(dead_code)]
+fn initialize_kalman_track_measure_all(
+) -> KalmanTrack<4, 4, KinematicState, ConstantVelocity, MeasureAllModel<4>> {
+    let gps_error = 3.;
+    let initial_state = GaussianState::<4>::new(
+        SVector::zeros(),
+        SMatrix::from_diagonal(&Vector4::new(gps_error, gps_error, 0., 0.)),
+    );
+    let track = KalmanTrack::new(
+        initial_state,
+        ConstantVelocity::new(0.05),
+        MeasureAllModel::new(SVector::<f64, 4>::new(0., 0., 0., 0.)),
     );
 
     track
