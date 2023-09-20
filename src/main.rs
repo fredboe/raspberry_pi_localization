@@ -22,6 +22,10 @@ mod sensor;
 mod user_input;
 mod utils;
 
+const GPS_ERROR: f64 = 6.0;
+const VEL_ERROR: f64 = 0.1;
+const DRIFT: f64 = 0.1;
+
 fn main() -> Result<(), Box<dyn Error>> {
     Utils::logger_init()?;
     log::info!("Robot started");
@@ -113,12 +117,14 @@ fn initialize_velocity_sensor() -> Result<ParSampler<Velocity>, Box<dyn Error>> 
 #[allow(dead_code)]
 fn initialize_kalman_track_xy(
 ) -> KalmanTrack<4, 2, Cartesian2D, ConstantVelocity, XYMeasurementModel<4>> {
-    let gps_error = 3.;
-    let initial_state = GaussianState::<4>::new(SVector::zeros(), gps_error * SMatrix::identity());
+    let initial_state = GaussianState::<4>::new(
+        SVector::zeros(),
+        SMatrix::from_diagonal(&Vector4::new(GPS_ERROR, GPS_ERROR, 0., 0.)),
+    );
     let track = KalmanTrack::new(
         initial_state,
-        ConstantVelocity::new(0.05),
-        XYMeasurementModel::new(gps_error, gps_error),
+        ConstantVelocity::new(DRIFT),
+        XYMeasurementModel::new(GPS_ERROR, GPS_ERROR),
     );
 
     track
@@ -127,15 +133,16 @@ fn initialize_kalman_track_xy(
 #[allow(dead_code)]
 fn initialize_kalman_track_measure_all(
 ) -> KalmanTrack<4, 4, KinematicState, ConstantVelocity, MeasureAllModel<4>> {
-    let gps_error = 3.;
     let initial_state = GaussianState::<4>::new(
         SVector::zeros(),
-        SMatrix::from_diagonal(&Vector4::new(gps_error, gps_error, 0., 0.)),
+        SMatrix::from_diagonal(&Vector4::new(GPS_ERROR, GPS_ERROR, 0., 0.)),
     );
     let track = KalmanTrack::new(
         initial_state,
-        ConstantVelocity::new(0.05),
-        MeasureAllModel::new(SVector::<f64, 4>::new(0., 0., 0., 0.)),
+        ConstantVelocity::new(DRIFT),
+        MeasureAllModel::new(SVector::<f64, 4>::new(
+            GPS_ERROR, GPS_ERROR, VEL_ERROR, VEL_ERROR,
+        )),
     );
 
     track

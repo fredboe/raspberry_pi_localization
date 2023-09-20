@@ -92,6 +92,7 @@ impl<O: Iterator<Item = Orientation>, F: Iterator<Item = DistanceMM>> Iterator
         if let (Some(orientation), Some(distance_mm)) = (orientation, distance_mm) {
             let now = Instant::now();
             let time_passed = now - self.last_time;
+            self.last_time = now;
 
             // velocity in local frame
             let v_local = Velocity::new(
@@ -100,8 +101,8 @@ impl<O: Iterator<Item = Orientation>, F: Iterator<Item = DistanceMM>> Iterator
             );
 
             // velocity in global frame
-            let vx = v_local.value() * orientation.radian.sin();
-            let vy = v_local.value() * orientation.radian.cos();
+            let vx = v_local.vx * orientation.radian.cos() + v_local.vy * orientation.radian.sin();
+            let vy = -v_local.vx * orientation.radian.sin() + v_local.vy * orientation.radian.cos();
 
             Some(Velocity::new(vx, vy))
         } else {
