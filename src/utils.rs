@@ -34,22 +34,34 @@ impl Utils {
     }
 
     /// # Explanation
-    /// This function asks the gps sensor permanently for the position and once a position is given
-    /// it is returned.
+    /// This function either looks for the BASE_POINT_LON and BASE_POINT_LAT environment variables or
+    /// it asks the gps sensor permanently for the position and once a position is given it is returned.
     pub fn get_base_point<GPS: Iterator<Item = GeoCoord>>(gps_sensor: &mut GPS) -> GeoCoord {
-        if let (Ok(Ok(base_point_lon)), Ok(Ok(base_point_lat))) = (
-            std::env::var("BASE_POINT_LON").map(|s| s.parse()),
-            std::env::var("BASE_POINT_LAT").map(|s| s.parse()),
-        ) {
-            return GeoCoord::new(base_point_lon, base_point_lat);
-        }
+        Self::get_base_point_from_env().unwrap_or(Self::get_base_point_from_gps_sensor(gps_sensor))
+    }
 
-        for _ in GameLoop::from_fps(1000) {
+    fn get_base_point_from_env() -> Option<GeoCoord> {
+        let longitude = std::env::var("BASE_POINT_LON")
+            .ok()
+            .and_then(|val| val.parse::<f64>().ok());
+        let latitude = std::env::var("BASE_POINT_LAT")
+            .ok()
+            .and_then(|val| val.parse::<f64>().ok());
+
+        match (longitude, latitude) {
+            (Some(lon), Some(lat)) => Some(GeoCoord::new(lon, lat)),
+            _ => None,
+        }
+    }
+
+    fn get_base_point_from_gps_sensor<GPS: Iterator<Item = GeoCoord>>(
+        gps_sensor: &mut GPS,
+    ) -> GeoCoord {
+        for _ in GameLoop::from_fps(10) {
             if let Some(position) = gps_sensor.next() {
                 return position;
             }
         }
-
         // this will not be reached
         GeoCoord::new(0., 0.)
     }
