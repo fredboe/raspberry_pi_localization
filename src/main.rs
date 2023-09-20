@@ -24,7 +24,7 @@ mod utils;
 
 const GPS_ERROR: f64 = 6.0;
 const VEL_ERROR: f64 = 0.1;
-const DRIFT: f64 = 0.1;
+const DRIFT: f64 = 0.16;
 
 fn main() -> Result<(), Box<dyn Error>> {
     Utils::logger_init()?;

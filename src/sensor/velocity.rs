@@ -58,10 +58,6 @@ impl Velocity {
     pub fn new(vx: f64, vy: f64) -> Self {
         Velocity { vx, vy }
     }
-
-    pub fn value(&self) -> f64 {
-        (self.vx * self.vx + self.vy * self.vy).sqrt()
-    }
 }
 
 pub struct OrientedVelocity<O, F> {
