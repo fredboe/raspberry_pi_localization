@@ -37,6 +37,13 @@ impl Utils {
     /// This function asks the gps sensor permanently for the position and once a position is given
     /// it is returned.
     pub fn get_base_point<GPS: Iterator<Item = GeoCoord>>(gps_sensor: &mut GPS) -> GeoCoord {
+        if let (Ok(Ok(base_point_lon)), Ok(Ok(base_point_lat))) = (
+            std::env::var("BASE_POINT_LON").map(|s| s.parse()),
+            std::env::var("BASE_POINT_LAT").map(|s| s.parse()),
+        ) {
+            return GeoCoord::new(base_point_lon, base_point_lat);
+        }
+
         for _ in GameLoop::from_fps(1000) {
             if let Some(position) = gps_sensor.next() {
                 return position;

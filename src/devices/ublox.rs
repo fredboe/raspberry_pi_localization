@@ -24,10 +24,7 @@ impl SimpleUbloxSensor {
 
         self.port.read_exact(&mut data_buffer)?;
 
-        // log::info!(
-        //     "Data from GPS sensor: {:?}",
-        //     String::from_utf8(data_buffer.clone())
-        // );
+        log::trace!("GPS data: {:?}", String::from_utf8(data_buffer.clone()));
 
         Ok(data_buffer)
     }
