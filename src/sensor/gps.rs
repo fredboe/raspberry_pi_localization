@@ -1,6 +1,10 @@
 use nalgebra::{Matrix3, SVector, Vector3};
 use nmea::sentences::GgaData;
 
+trait GeoToCartesian {
+    fn convert(&self, geo_coord: GeoCoord, height: f64) -> Cartesian3D;
+}
+
 /// # Explanation
 /// The GeoCoord struct represents a geographical coordinate (consisting of longitude and latitude).
 #[derive(Debug, Copy, Clone)]
@@ -54,6 +58,27 @@ impl Into<SVector<f64, 2>> for Cartesian2D {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct Cartesian3D {
+    pub x: f64,
+    pub y: f64,
+    pub z: f64,
+}
+
+impl Cartesian3D {
+    pub fn new(x: f64, y: f64, z: f64) -> Self {
+        Cartesian3D { x, y, z }
+    }
+}
+
+impl Into<Cartesian2D> for Cartesian3D {
+    /// # Explanation
+    /// Ignores the z component
+    fn into(self) -> Cartesian2D {
+        Cartesian2D::new(self.x, self.y)
+    }
+}
+
 /// # Explanation
 /// The GeoToECEF struct is used to convert geographic coordinates (longitude and latitude) to cartesian coordinates
 /// with the ECEF method. Since we ignore the height coordinate we set it to 0 in the process.
@@ -64,20 +89,24 @@ impl GeoToECEF {
         GeoToECEF {}
     }
 
-    fn n(rad: f64) -> f64 {
-        const ELLIPSE_A: f64 = 6378137.0;
-        const ECCENTRICITY: f64 = 0.00669437999014;
-        ELLIPSE_A / (1.0 - ECCENTRICITY * rad.sin() * rad.sin()).sqrt()
-    }
+    const ELLIPSE_A: f64 = 6378137.0;
+    const ECCENTRICITY_SQRD: f64 = 0.0066943799901413165;
 
-    pub fn convert(&self, x: GeoCoord) -> Cartesian2D {
-        let geo_coord = x;
+    fn n(rad: f64) -> f64 {
+        Self::ELLIPSE_A / (1.0 - Self::ECCENTRICITY_SQRD * rad.sin() * rad.sin()).sqrt()
+    }
+}
+
+impl GeoToCartesian for GeoToECEF {
+    fn convert(&self, geo_coord: GeoCoord, height: f64) -> Cartesian3D {
         let rad_lat = geo_coord.lat.to_radians();
         let rad_lon = geo_coord.lon.to_radians();
-        let x = Self::n(rad_lat) * rad_lat.cos() * rad_lon.cos();
-        let y = Self::n(rad_lat) * rad_lat.cos() * rad_lon.sin();
 
-        Cartesian2D::new(x, y)
+        let x = (Self::n(rad_lat) + height) * rad_lat.cos() * rad_lon.cos();
+        let y = (Self::n(rad_lat) + height) * rad_lat.cos() * rad_lon.sin();
+        let z = ((1.0 - Self::ECCENTRICITY_SQRD) * Self::n(rad_lat) + height) * rad_lat.sin();
+
+        Cartesian3D::new(x, y, z)
     }
 }
 
@@ -85,47 +114,52 @@ impl GeoToECEF {
 /// The GeoToENU struct is used to convert geographic coordinates (longitude and latitude) to cartesian coordinates
 /// with the ENU method. Since we ignore the height coordinate we set it to 0 in the process.
 pub struct GeoToENU {
-    base_point: Cartesian2D,
+    base_point: Cartesian3D,
     rotation_matrix: Matrix3<f64>,
     ecef: GeoToECEF,
 }
 
 impl GeoToENU {
-    pub fn new(base_point: GeoCoord) -> Self {
+    pub fn new(base_point: GeoCoord, initial_height: f64) -> Self {
         let ecef = GeoToECEF::new();
         let GeoCoord {
-            lon: b_lon,
-            lat: b_lat,
+            lon: base_lon,
+            lat: base_lat,
         } = base_point;
 
+        let rad_base_lon = base_lon.to_radians();
+        let rad_base_lat = base_lat.to_radians();
+
         let rotation_matrix = Matrix3::new(
-            -b_lon.sin(),
-            b_lon.cos(),
+            -rad_base_lon.sin(),
+            rad_base_lon.cos(),
             0.0,
-            -b_lat.sin() * b_lon.cos(),
-            -b_lat.sin() * b_lon.sin(),
-            b_lat.cos(),
-            b_lat.cos() * b_lon.cos(),
-            b_lat.cos() * b_lon.sin(),
-            b_lat.sin(),
+            -rad_base_lat.sin() * rad_base_lon.cos(),
+            -rad_base_lat.sin() * rad_base_lon.sin(),
+            rad_base_lat.cos(),
+            rad_base_lat.cos() * rad_base_lon.cos(),
+            rad_base_lat.cos() * rad_base_lon.sin(),
+            rad_base_lat.sin(),
         );
 
         GeoToENU {
-            base_point: ecef.convert(base_point),
+            base_point: ecef.convert(base_point, initial_height),
             rotation_matrix,
             ecef,
         }
     }
+}
 
-    pub fn convert(&self, x: GeoCoord) -> Cartesian2D {
-        let ecef_coord = self.ecef.convert(x);
+impl GeoToCartesian for GeoToENU {
+    fn convert(&self, geo_coord: GeoCoord, height: f64) -> Cartesian3D {
+        let ecef_coord = self.ecef.convert(geo_coord, height);
         let ecef_diff = Vector3::new(
             ecef_coord.x - self.base_point.x,
             ecef_coord.y - self.base_point.y,
-            0.0,
+            ecef_coord.z - self.base_point.z,
         );
         let enu_coords = self.rotation_matrix * ecef_diff;
 
-        Cartesian2D::new(enu_coords.x, enu_coords.y)
+        Cartesian3D::new(enu_coords.x, enu_coords.y, enu_coords.z)
     }
 }

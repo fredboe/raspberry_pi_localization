@@ -23,7 +23,7 @@ mod user_input;
 mod utils;
 
 const GPS_ERROR: f64 = 3.0;
-const VEL_ERROR: f64 = 0.2;
+const VEL_ERROR: f64 = 0.1;
 const DRIFT: f64 = 0.16;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -97,8 +97,9 @@ fn run() -> Result<(), Box<dyn Error>> {
 fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error>> {
     let mut gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?;
     let base_point = Utils::get_base_point(&mut gps_sensor);
-    let cartesian_converter = GeoToENU::new(base_point);
-    let position_sensor = gps_sensor.map(move |geo_coord| cartesian_converter.convert(geo_coord));
+    let cartesian_converter = GeoToENU::new(base_point, 0.0);
+    let position_sensor =
+        gps_sensor.map(move |geo_coord| cartesian_converter.convert(geo_coord, 0.0).into());
 
     Ok(ParSampler::new(5, position_sensor))
 }
