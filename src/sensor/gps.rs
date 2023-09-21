@@ -1,7 +1,7 @@
 use nalgebra::{Matrix3, SVector, Vector3};
 use nmea::sentences::GgaData;
 
-trait GeoToCartesian {
+pub trait GeoToCartesian {
     fn convert(&self, geo_coord: GeoCoord, height: f64) -> Cartesian3D;
 }
 

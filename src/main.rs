@@ -6,7 +6,7 @@ use crate::devices::paa5100::PAA5100;
 use crate::devices::ublox::SimpleUbloxSensor;
 use crate::filter::model::{ConstantVelocity, MeasureAllModel, XYMeasurementModel};
 use crate::filter::track::{GaussianState, KalmanTrack};
-use crate::sensor::gps::{Cartesian2D, GeoToENU};
+use crate::sensor::gps::{Cartesian2D, GeoToCartesian, GeoToENU};
 use crate::sensor::velocity::{KinematicState, OrientedVelocity, Velocity};
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{GameLoop, LogErrUnwrap, ParSampler, Utils};
