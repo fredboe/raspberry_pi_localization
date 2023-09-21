@@ -1,6 +1,6 @@
 use crate::sensor::gps::GeoCoord;
 use log::LevelFilter;
-use nmea::sentences::RmcData;
+use nmea::sentences::GgaData;
 use nmea::ParseResult;
 use regex::Regex;
 use simplelog::{Config, WriteLogger};
@@ -16,19 +16,19 @@ pub struct Utils;
 impl Utils {
     /// # Explanation
     /// This function parses the given buffer to the RMC format.
-    pub fn parse_to_rmc(data: Vec<u8>) -> Option<RmcData> {
-        let re = Regex::new(r"\$.{0,2}RMC.{0,100}\r\n").unwrap();
+    pub fn parse_to_gga(data: Vec<u8>) -> Option<GgaData> {
+        let re = Regex::new(r"\$.{0,2}GGA.{0,100}\r\n").unwrap();
 
         let parse_result = String::from_utf8(data)
             .ok()
             .and_then(|data_string| {
                 re.find(data_string.as_str())
-                    .map(|rmc_match| rmc_match.as_str().to_string())
+                    .map(|gga_match| gga_match.as_str().to_string())
             })
-            .and_then(|rmc_string| nmea::parse_str(rmc_string.as_str()).ok());
+            .and_then(|gga_sentence| nmea::parse_str(gga_sentence.as_str()).ok());
 
         match parse_result {
-            Some(ParseResult::RMC(rmc_data)) => Some(rmc_data),
+            Some(ParseResult::GGA(gga_sentence)) => Some(gga_sentence),
             _ => None,
         }
     }

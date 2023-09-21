@@ -24,8 +24,6 @@ impl SimpleUbloxSensor {
 
         self.port.read_exact(&mut data_buffer)?;
 
-        log::trace!("GPS data: {:?}", String::from_utf8(data_buffer.clone()));
-
         Ok(data_buffer)
     }
 }
@@ -39,8 +37,12 @@ impl Iterator for SimpleUbloxSensor {
     fn next(&mut self) -> Option<Self::Item> {
         let data = self.read_from_device().ok();
         let coords = data
-            .and_then(|data| Utils::parse_to_rmc(data))
-            .and_then(|rmc_data| GeoCoord::from_rmc(rmc_data));
+            .and_then(|data| {
+                let gga_sentence = Utils::parse_to_gga(data);
+                log::trace!("GGA: {:?}", gga_sentence);
+                gga_sentence
+            })
+            .and_then(|gga_sentence| GeoCoord::from_gga(gga_sentence));
 
         log::trace!("Geographic coordinates (uBlox): {:?}", coords);
         coords

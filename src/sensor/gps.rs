@@ -1,5 +1,5 @@
 use nalgebra::{Matrix3, SVector, Vector3};
-use nmea::sentences::RmcData;
+use nmea::sentences::GgaData;
 
 /// # Explanation
 /// The GeoCoord struct represents a geographical coordinate (consisting of longitude and latitude).
@@ -18,13 +18,13 @@ impl GeoCoord {
     }
 
     /// # Explanation
-    /// This function takes an RMC-sentence and extracts the geographic coordinates (longitude and latitude)
+    /// This function takes an GGA-sentence and extracts the geographic coordinates (longitude and latitude)
     /// from it.
-    pub fn from_rmc(rmc_data: RmcData) -> Option<GeoCoord> {
-        match rmc_data {
-            RmcData {
-                lon: Some(lon),
-                lat: Some(lat),
+    pub fn from_gga(gga_sentence: GgaData) -> Option<GeoCoord> {
+        match gga_sentence {
+            GgaData {
+                longitude: Some(lon),
+                latitude: Some(lat),
                 ..
             } => Some(GeoCoord::new(lon, lat)),
             _ => None,
