@@ -34,24 +34,9 @@ impl Utils {
     }
 
     /// # Explanation
-    /// This function either looks for the BASE_POINT_LON and BASE_POINT_LAT environment variables or
-    /// it asks the gps sensor permanently for the position and once a position is given it is returned.
+    /// This function asks the gps sensor permanently for the position and once a position is given it is returned.
     pub fn get_base_point<GPS: Iterator<Item = GeoCoord>>(gps_sensor: &mut GPS) -> GeoCoord {
-        Self::get_base_point_from_env().unwrap_or(Self::get_base_point_from_gps_sensor(gps_sensor))
-    }
-
-    fn get_base_point_from_env() -> Option<GeoCoord> {
-        let longitude = std::env::var("BASE_POINT_LON")
-            .ok()
-            .and_then(|val| val.parse::<f64>().ok());
-        let latitude = std::env::var("BASE_POINT_LAT")
-            .ok()
-            .and_then(|val| val.parse::<f64>().ok());
-
-        match (longitude, latitude) {
-            (Some(lon), Some(lat)) => Some(GeoCoord::new(lon, lat)),
-            _ => None,
-        }
+        Self::get_base_point_from_gps_sensor(gps_sensor)
     }
 
     fn get_base_point_from_gps_sensor<GPS: Iterator<Item = GeoCoord>>(
