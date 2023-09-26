@@ -18,15 +18,12 @@ pub struct Utils;
 impl Utils {
     /// # Explanation
     /// This function parses the given buffer to the RMC format.
-    pub fn parse_to_gga(data: Vec<u8>) -> Option<GgaData> {
+    pub fn parse_to_gga(sentences: String) -> Option<GgaData> {
         let re = Regex::new(r"\$.{0,2}GGA.{0,200}\r\n").unwrap();
 
-        let parse_result = String::from_utf8(data)
-            .ok()
-            .and_then(|data_string| {
-                re.find(data_string.as_str())
-                    .map(|gga_match| gga_match.as_str().to_string())
-            })
+        let parse_result = re
+            .find(sentences.as_str())
+            .map(|gga_match| gga_match.as_str().to_string())
             .and_then(|gga_sentence| nmea::parse_str(gga_sentence.as_str()).ok());
 
         match parse_result {

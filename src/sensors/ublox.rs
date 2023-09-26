@@ -11,8 +11,8 @@ use std::sync::mpsc::SendError;
 use std::time::{Duration, Instant};
 
 /// # Explanation
-/// This is a simple interface to an ublox gps sensor_utils that is connected via usb. With this interface
-/// one is able to retrieve the nmea rmc sentences the sensors sends over the usb connection.
+/// This is a simple interface to an ublox gps sensor that is connected via usb. With this interface
+/// one is able to retrieve the nmea sentences the sensor sends over the usb connection.
 pub struct UbloxSensor {
     port: Box<dyn SerialPort>,
 }
@@ -43,19 +43,21 @@ impl UbloxSensor {
 /// Iterator to retrieve the geographic coordinates (longitude and latitude) of the sensor_utils.
 /// The iterator reads the available data from the sensor_utils and retrieves the geographic coordinates.
 impl Iterator for UbloxSensor {
-    type Item = GgaData;
+    type Item = String;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let data = self.read_from_device().ok();
-        let gga_sentence = data.and_then(|data| Utils::parse_to_gga(data));
-        log::trace!("GGA: {:?}", gga_sentence);
+        let nmea_sentences = self
+            .read_from_device()
+            .ok()
+            .and_then(|data| String::from_utf8(data).ok());
+        log::trace!("NMEA: {:?}", nmea_sentences);
 
-        gga_sentence
+        nmea_sentences
     }
 }
 
 /// # Explanation
-/// This struct represents a ublox gps sensor_utils that corrects the gps data with rtcm data (via ntrip).
+/// This struct represents a ublox gps sensor that corrects the gps data with rtcm data (via ntrip).
 pub struct CorrectionUbloxSensor {
     gps_sensor: UbloxSensor,
     ntrip_requester: Requester<GgaData, Vec<u8>>,
@@ -106,7 +108,10 @@ impl Iterator for CorrectionUbloxSensor {
     type Item = GgaData;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let gga_sentence = self.gps_sensor.next();
+        let gga_sentence = self
+            .gps_sensor
+            .next()
+            .and_then(|nmea_sentences| Utils::parse_to_gga(nmea_sentences));
         if let Some(gga_sentence) = gga_sentence {
             self.apply_available_correction().log_err_unwrap(());
 
