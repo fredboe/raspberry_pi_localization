@@ -3,10 +3,10 @@ use crate::deciders::{Decider, FollowJoystick};
 use crate::devices::adafruit::AdafruitDCStepperHat;
 use crate::devices::bno055::BNO055Compass;
 use crate::devices::paa5100::PAA5100;
-use crate::devices::ublox::SimpleUbloxSensor;
+use crate::devices::ublox::{CorrectionUbloxSensor, SimpleUbloxSensor};
 use crate::filter::model::{ConstantVelocity, MeasureAllModel, XYMeasurementModel};
 use crate::filter::track::{GaussianState, KalmanTrack};
-use crate::sensor::gps::{Cartesian2D, GeoToCartesian, GeoToENU};
+use crate::sensor::gps::{Cartesian2D, GeoCoord, GeoToCartesian, GeoToENU};
 use crate::sensor::velocity::{KinematicState, OrientedVelocity, Velocity};
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{GameLoop, LogErrUnwrap, ParSampler, Utils};
@@ -95,13 +95,17 @@ fn run() -> Result<(), Box<dyn Error>> {
 }
 
 fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error>> {
-    let mut gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?;
-    let base_point = Utils::get_base_point(&mut gps_sensor);
-    let cartesian_converter = GeoToENU::new(base_point, 0.0);
-    let position_sensor =
-        gps_sensor.map(move |geo_coord| cartesian_converter.convert(geo_coord, 0.0).into());
+    let ntrip_client = Utils::get_ntrip_client()?;
+    let gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?;
+    let mut corrected_gps_sensor = CorrectionUbloxSensor::new(gps_sensor, ntrip_client)
+        .flat_map(|gga_sentence| GeoCoord::from_gga(gga_sentence));
 
-    Ok(ParSampler::new(5, position_sensor))
+    let base_point = Utils::get_base_point(&mut corrected_gps_sensor);
+    let cartesian_converter = GeoToENU::new(base_point, 0.0);
+    let position_sensor = corrected_gps_sensor
+        .map(move |geo_coord| cartesian_converter.convert(geo_coord, 0.0).into());
+
+    Ok(ParSampler::new(4, position_sensor))
 }
 
 fn initialize_velocity_sensor() -> Result<ParSampler<Velocity>, Box<dyn Error>> {
@@ -112,7 +116,7 @@ fn initialize_velocity_sensor() -> Result<ParSampler<Velocity>, Box<dyn Error>> 
     let oriented_velocity_sensor =
         OrientedVelocity::new(orientation_sensor, distance_traveled_sensor);
 
-    Ok(ParSampler::new(10, oriented_velocity_sensor))
+    Ok(ParSampler::new(4, oriented_velocity_sensor))
 }
 
 #[allow(dead_code)]

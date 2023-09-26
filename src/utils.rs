@@ -1,3 +1,4 @@
+use crate::devices::ublox::NtripClient;
 use crate::sensor::gps::GeoCoord;
 use log::LevelFilter;
 use nmea::sentences::GgaData;
@@ -7,7 +8,8 @@ use simplelog::{Config, WriteLogger};
 use std::error::Error;
 use std::fmt::Display;
 use std::str::FromStr;
-use std::sync::mpsc::{Receiver, Sender};
+use std::sync::mpsc;
+use std::sync::mpsc::{Receiver, SendError, Sender};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -17,7 +19,7 @@ impl Utils {
     /// # Explanation
     /// This function parses the given buffer to the RMC format.
     pub fn parse_to_gga(data: Vec<u8>) -> Option<GgaData> {
-        let re = Regex::new(r"\$.{0,2}GGA.{0,100}\r\n").unwrap();
+        let re = Regex::new(r"\$.{0,2}GGA.{0,200}\r\n").unwrap();
 
         let parse_result = String::from_utf8(data)
             .ok()
@@ -31,6 +33,52 @@ impl Utils {
             Some(ParseResult::GGA(gga_sentence)) => Some(gga_sentence),
             _ => None,
         }
+    }
+
+    /// # Explanation
+    /// This function generates a nmea gga sentence from the GgaData struct.
+    pub fn gga_data_to_string(gga: &GgaData) -> String {
+        fn checksum(sentence: &str) -> u8 {
+            let mut checksum = 0;
+            for character in sentence.chars().skip(1) {
+                checksum ^= character as u8;
+            }
+            checksum
+        }
+
+        let fix_time = gga
+            .fix_time
+            .map(|t| t.format("%H%M%S.%3f").to_string())
+            .unwrap();
+        let fix_type = gga.fix_type.map(|t| t as u8).unwrap_or(0);
+        let lat = gga.latitude.unwrap_or(0.0);
+        let lon = gga.longitude.unwrap_or(0.0);
+        let fix_satellites = gga.fix_satellites.unwrap_or(0);
+        let hdop = gga.hdop.unwrap_or(0.0);
+        let altitude = gga.altitude.unwrap_or(0.0);
+        let geoid_separation = gga.geoid_separation.unwrap_or(0.0);
+
+        let gga_sentence = format!(
+            "$GPGGA,{},{:02}{:05.2},{},{:03}{:05.2},{},{},{},{},{},M,{},M,,",
+            fix_time,
+            lat.abs().trunc() as u32,
+            lat.abs().fract() * 60.0,
+            if lat >= 0.0 { "N" } else { "S" },
+            lon.abs().trunc() as u32,
+            lon.abs().fract() * 60.0,
+            if lon >= 0.0 { "E" } else { "W" },
+            fix_type,
+            fix_satellites,
+            hdop,
+            altitude,
+            geoid_separation,
+        );
+
+        let checksum = checksum(&gga_sentence);
+
+        let complete_sentence = format!("{}*{:02X}\r\n", gga_sentence, checksum);
+
+        complete_sentence
     }
 
     /// # Explanation
@@ -73,6 +121,19 @@ impl Utils {
     }
 
     /// # Explanation
+    /// This function returns an ntrip client with the settings based on the following environment variables:
+    /// NTRIP_ADDR, NTRIP_PORT (needs to be a u16), NTRIP_MOUNTPOINT, NTRIP_USERNAME, NTRIP_PASSWORD.
+    pub fn get_ntrip_client() -> Result<NtripClient, Box<dyn Error>> {
+        let addr = std::env::var("NTRIP_ADDR")?;
+        let port = std::env::var("NTRIP_PORT")?.parse()?;
+        let mountpoint = std::env::var("NTRIP_MOUNTPOINT")?;
+        let username = std::env::var("NTRIP_USERNAME")?;
+        let password = std::env::var("NTRIP_PASSWORD")?;
+
+        Ok(NtripClient::new(addr, port, mountpoint, username, password))
+    }
+
+    /// # Explanation
     /// This function initializes the logger. It reads the RUST_LOG environment variable and sets the log level.
     /// RUST_LOG should be one of error, warn, info, debug or trace (the default is info). The function also
     /// sets the output file to raspberry_pi_localization.log .
@@ -84,6 +145,21 @@ impl Utils {
         let log_file = std::fs::File::create("raspberry_pi_localization.log")?;
         WriteLogger::init(log_level, Config::default(), log_file)?;
         Ok(())
+    }
+
+    /// # Explanation
+    /// This function clones the given GgaData object.
+    pub fn clone_gga_data(gga: &GgaData) -> GgaData {
+        GgaData {
+            fix_time: gga.fix_time,
+            fix_type: gga.fix_type,
+            latitude: gga.latitude,
+            longitude: gga.longitude,
+            fix_satellites: gga.fix_satellites,
+            hdop: gga.hdop,
+            altitude: gga.altitude,
+            geoid_separation: gga.geoid_separation,
+        }
     }
 }
 
@@ -100,7 +176,7 @@ impl<T, E: Display> LogErrUnwrap<T> for Result<T, E> {
     /// the given default value is returned.
     fn log_err_unwrap(self, default: T) -> T {
         self.unwrap_or_else(|e| {
-            log::error!("{}", e);
+            log::error!("Error: {}", e);
             default
         })
     }
@@ -168,8 +244,8 @@ impl<T: Send + 'static> ParSampler<T> {
         sample_rate: usize,
         mut iterator: IT,
     ) -> Self {
-        let (stop_sender, stop_receiver) = std::sync::mpsc::channel();
-        let (state_sender, state_receiver) = std::sync::mpsc::channel();
+        let (stop_sender, stop_receiver) = mpsc::channel();
+        let (state_sender, state_receiver) = mpsc::channel();
 
         let handle = std::thread::spawn(move || {
             for _ in GameLoop::from_fps(sample_rate) {
@@ -211,6 +287,73 @@ impl<T> Drop for ParSampler<T> {
         self.stop_sender.send(Stop).expect(ERR_MSG);
 
         if let Some(handle) = self.handle.take() {
+            handle.join().expect(ERR_MSG);
+        }
+    }
+}
+
+/// # Explanation
+/// This struct can be used to create requests (and access the responses) in a non-blocking way.
+/// The struct works by having a worker thread (maybe later a thread pool) that performs all the
+/// requests. The requests and the responses are moved with channels.
+///
+/// This struct is mainly used in the ntrip client struct.
+pub struct Requester<Request, Response> {
+    stop_sender: Sender<Stop>,
+    request_sender: Sender<Request>,
+    response_receiver: Receiver<Response>,
+    worker_handle: Option<JoinHandle<()>>,
+}
+
+impl<Request: Send + 'static, Response: Send + 'static> Requester<Request, Response> {
+    /// # Explanation
+    /// This function creates a new Requester.
+    ///
+    /// ### Parameter
+    /// The parameter f is a function that is executed when a new request comes in
+    /// (so this should be a function from Request to Response (Request -> Response)).
+    pub fn new<F>(f: F) -> Self
+    where
+        F: Fn(Request) -> Response + Send + 'static,
+    {
+        let (stop_sender, stop_receiver) = mpsc::channel();
+        let (request_sender, request_receiver) = mpsc::channel();
+        let (response_sender, response_receiver) = mpsc::channel();
+
+        // maybe later use of a thread pool
+        let worker = std::thread::spawn(move || {
+            while stop_receiver.try_recv().is_err() {
+                let request = request_receiver.try_recv();
+                if let Ok(request) = request {
+                    let response = f(request);
+                    response_sender.send(response).unwrap_or(());
+                }
+            }
+        });
+
+        Requester {
+            stop_sender,
+            request_sender,
+            response_receiver,
+            worker_handle: Some(worker),
+        }
+    }
+
+    pub fn request(&mut self, request: Request) -> Result<(), SendError<Request>> {
+        self.request_sender.send(request)
+    }
+
+    pub fn get_responses(&mut self) -> Vec<Response> {
+        self.response_receiver.try_iter().collect()
+    }
+}
+
+impl<X, Y> Drop for Requester<X, Y> {
+    fn drop(&mut self) {
+        const ERR_MSG: &str = "Requester: Could not terminate the worker thread.";
+        self.stop_sender.send(Stop).expect(ERR_MSG);
+
+        if let Some(handle) = self.worker_handle.take() {
             handle.join().expect(ERR_MSG);
         }
     }
