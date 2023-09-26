@@ -1,5 +1,5 @@
-use crate::devices::ublox::NtripClient;
-use crate::sensor::gps::GeoCoord;
+use crate::sensor_utils::gps::GeoCoord;
+use crate::sensors::ublox::NtripClient;
 use log::LevelFilter;
 use nmea::sentences::GgaData;
 use nmea::ParseResult;
@@ -82,7 +82,7 @@ impl Utils {
     }
 
     /// # Explanation
-    /// This function asks the gps sensor permanently for the position and once a position is given it is returned.
+    /// This function asks the gps sensor_utils permanently for the position and once a position is given it is returned.
     pub fn get_base_point<GPS: Iterator<Item = GeoCoord>>(gps_sensor: &mut GPS) -> GeoCoord {
         Self::get_base_point_from_gps_sensor(gps_sensor)
     }
@@ -229,7 +229,7 @@ struct Stop;
 
 /// # Explanation
 /// The ParSampler struct can be used if an iterator should be called with a specific frame rate on a different thread.
-/// I.e. for a sensor struct that should sample the device with a specific frame rate.
+/// I.e. for a sensor_utils struct that should sample the device with a specific frame rate.
 ///
 /// The ParSampler keeps the values as a state so that always the last value the iterator returned can be accessed.
 pub struct ParSampler<T> {

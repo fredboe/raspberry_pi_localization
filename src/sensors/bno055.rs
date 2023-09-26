@@ -1,11 +1,11 @@
-use crate::sensor::velocity::Orientation;
+use crate::sensor_utils::velocity::Orientation;
 use i2cdev::core::I2CDevice;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
 use std::io;
 use std::io::ErrorKind;
 
 /// # Explanation
-/// This is a simple implementation to interact with the BNO055 sensor.
+/// This is a simple implementation to interact with the BNO055 sensor_utils.
 /// With it one can get the linear acceleration, the orientation and then the two combined as the
 /// acceleration in global frame (east represents the x-axis and north the y-axis).
 pub struct BNO055Compass {

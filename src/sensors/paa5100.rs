@@ -1,4 +1,4 @@
-use crate::sensor::velocity::DistanceMM;
+use crate::sensor_utils::velocity::DistanceMM;
 use spidev::{SpiModeFlags, Spidev, SpidevOptions, SpidevTransfer};
 use std::io;
 use std::io::ErrorKind;
@@ -238,7 +238,7 @@ impl PAA5100 {
             Err(io::Error::new(
                 ErrorKind::InvalidData,
                 format!(
-                    "The data of the sensor is inaccurate: squal {}, shutter: {}",
+                    "The data of the sensor_utils is inaccurate: squal {}, shutter: {}",
                     squal, shutter
                 ),
             ))

@@ -1,4 +1,4 @@
-use crate::sensor::gps::Cartesian2D;
+use crate::sensor_utils::gps::Cartesian2D;
 use nalgebra::SVector;
 use std::time::Instant;
 

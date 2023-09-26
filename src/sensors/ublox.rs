@@ -11,16 +11,16 @@ use std::sync::mpsc::SendError;
 use std::time::{Duration, Instant};
 
 /// # Explanation
-/// This is a simple interface to an ublox gps sensor that is connected via usb. With this interface
-/// one is able to retrieve the nmea rmc sentences the devices sends over the usb connection.
-pub struct SimpleUbloxSensor {
+/// This is a simple interface to an ublox gps sensor_utils that is connected via usb. With this interface
+/// one is able to retrieve the nmea rmc sentences the sensors sends over the usb connection.
+pub struct UbloxSensor {
     port: Box<dyn SerialPort>,
 }
 
-impl SimpleUbloxSensor {
+impl UbloxSensor {
     pub fn new(path: &str) -> Result<Self, serialport::Error> {
         let port = serialport::new(path, 38400).open()?;
-        Ok(SimpleUbloxSensor { port })
+        Ok(UbloxSensor { port })
     }
 
     /// # Explanation
@@ -40,9 +40,9 @@ impl SimpleUbloxSensor {
 }
 
 /// # Explanation
-/// Iterator to retrieve the geographic coordinates (longitude and latitude) of the sensor.
-/// The iterator reads the available data from the sensor and retrieves the geographic coordinates.
-impl Iterator for SimpleUbloxSensor {
+/// Iterator to retrieve the geographic coordinates (longitude and latitude) of the sensor_utils.
+/// The iterator reads the available data from the sensor_utils and retrieves the geographic coordinates.
+impl Iterator for UbloxSensor {
     type Item = GgaData;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -55,9 +55,9 @@ impl Iterator for SimpleUbloxSensor {
 }
 
 /// # Explanation
-/// This struct represents a ublox gps sensor that corrects the gps data with rtcm data (via ntrip).
+/// This struct represents a ublox gps sensor_utils that corrects the gps data with rtcm data (via ntrip).
 pub struct CorrectionUbloxSensor {
-    gps_sensor: SimpleUbloxSensor,
+    gps_sensor: UbloxSensor,
     ntrip_requester: Requester<GgaData, Vec<u8>>,
     last_time: Instant,
 }
@@ -65,7 +65,7 @@ pub struct CorrectionUbloxSensor {
 impl CorrectionUbloxSensor {
     const DURATION_BETWEEN_CORRECTION: Duration = Duration::from_secs(2);
 
-    pub fn new(gps_sensor: SimpleUbloxSensor, ntrip_client: NtripClient) -> Self {
+    pub fn new(gps_sensor: UbloxSensor, ntrip_client: NtripClient) -> Self {
         let ntrip_requester = Requester::new(move |gga_sentence| {
             ntrip_client
                 .get_correction(&gga_sentence)
@@ -159,6 +159,8 @@ impl NtripClient {
     pub fn get_correction(&self, gga_sentence: &GgaData) -> Result<Vec<u8>, Box<dyn Error>> {
         // profile here. maybe dont create a new connection every time?
         let mut stream = TcpStream::connect(format!("{}:{}", self.addr, self.port))?;
+        stream.set_read_timeout(Some(Duration::from_secs(10)))?;
+        stream.set_write_timeout(Some(Duration::from_secs(10)))?;
 
         let request = self.create_request();
         stream.write_all(request.as_bytes())?;

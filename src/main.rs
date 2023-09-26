@@ -1,13 +1,13 @@
 use crate::actions::{perform_action, Action};
 use crate::deciders::{Decider, FollowJoystick};
-use crate::devices::adafruit::AdafruitDCStepperHat;
-use crate::devices::bno055::BNO055Compass;
-use crate::devices::paa5100::PAA5100;
-use crate::devices::ublox::{CorrectionUbloxSensor, SimpleUbloxSensor};
 use crate::filter::model::{ConstantVelocity, MeasureAllModel, XYMeasurementModel};
 use crate::filter::track::{GaussianState, KalmanTrack};
-use crate::sensor::gps::{Cartesian2D, GeoCoord, GeoToCartesian, GeoToENU};
-use crate::sensor::velocity::{KinematicState, OrientedVelocity, Velocity};
+use crate::sensor_utils::gps::{Cartesian2D, GeoCoord, GeoToCartesian, GeoToENU};
+use crate::sensor_utils::velocity::{KinematicState, OrientedVelocity, Velocity};
+use crate::sensors::adafruit::AdafruitDCStepperHat;
+use crate::sensors::bno055::BNO055Compass;
+use crate::sensors::paa5100::PAA5100;
+use crate::sensors::ublox::{CorrectionUbloxSensor, UbloxSensor};
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{GameLoop, LogErrUnwrap, ParSampler, Utils};
 use gilrs::Button;
@@ -16,9 +16,9 @@ use std::error::Error;
 
 mod actions;
 mod deciders;
-mod devices;
 mod filter;
-mod sensor;
+mod sensor_utils;
+mod sensors;
 mod user_input;
 mod utils;
 
@@ -41,8 +41,8 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// # Explanation
-/// The run function first initializes the gps sensor, the motor controller, the decider and the track.
-/// Then for every "frame" in the game loop the user input is retrieved; the gps sensor is asked for
+/// The run function first initializes the gps sensor_utils, the motor controller, the decider and the track.
+/// Then for every "frame" in the game loop the user input is retrieved; the gps sensor_utils is asked for
 /// the position which is then added to the track and in the end the action the decider returned is executed.
 fn run() -> Result<(), Box<dyn Error>> {
     println!("Starting the initialization...");
@@ -96,7 +96,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
 fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error>> {
     let ntrip_client = Utils::get_ntrip_client()?;
-    let gps_sensor = SimpleUbloxSensor::new("/dev/ttyACM0")?;
+    let gps_sensor = UbloxSensor::new("/dev/ttyACM0")?;
     let mut corrected_gps_sensor = CorrectionUbloxSensor::new(gps_sensor, ntrip_client)
         .flat_map(|gga_sentence| GeoCoord::from_gga(gga_sentence));
 
