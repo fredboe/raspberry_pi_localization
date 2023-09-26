@@ -1,9 +1,10 @@
-use crate::utils::{LogErrUnwrap, Requester, Utils};
+use crate::utils::{LogErrUnwrap, Requester};
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
 use nmea::sentences::GgaData;
+use nmea::ParseResult;
+use regex::Regex;
 use serialport::SerialPort;
-use std::error::Error;
 use std::io;
 use std::io::{BufReader, ErrorKind, Read, Write};
 use std::net::TcpStream;
@@ -58,19 +59,19 @@ impl Iterator for UbloxSensor {
 
 /// # Explanation
 /// This struct represents a ublox gps sensor that corrects the gps data with rtcm data (via ntrip).
-pub struct CorrectionUbloxSensor {
+pub struct NtripUbloxSensor {
     gps_sensor: UbloxSensor,
-    ntrip_requester: Requester<GgaData, Vec<u8>>,
+    ntrip_requester: Requester<String, Vec<u8>>,
     last_time: Instant,
 }
 
-impl CorrectionUbloxSensor {
+impl NtripUbloxSensor {
     const DURATION_BETWEEN_CORRECTION: Duration = Duration::from_secs(2);
 
     pub fn new(gps_sensor: UbloxSensor, ntrip_client: NtripClient) -> Self {
-        let ntrip_requester = Requester::new(move |gga_sentence| {
+        let ntrip_requester = Requester::new(move |gga_string: String| {
             ntrip_client
-                .get_correction(&gga_sentence)
+                .get_correction(&gga_string)
                 .unwrap_or_else(|error| {
                     log::info!(
                         "Error with accessing the rtcm data via ntrip. The error was: {}",
@@ -80,7 +81,7 @@ impl CorrectionUbloxSensor {
                 })
         });
 
-        CorrectionUbloxSensor {
+        NtripUbloxSensor {
             gps_sensor,
             ntrip_requester,
             last_time: Instant::now() - Self::DURATION_BETWEEN_CORRECTION,
@@ -94,7 +95,7 @@ impl CorrectionUbloxSensor {
         Ok(())
     }
 
-    fn request_new_correction(&mut self, gga_sentence: GgaData) -> Result<(), SendError<GgaData>> {
+    fn request_new_correction(&mut self, gga_sentence: String) -> Result<(), SendError<String>> {
         let now = Instant::now();
         if now - self.last_time >= Self::DURATION_BETWEEN_CORRECTION {
             self.last_time = now;
@@ -102,23 +103,38 @@ impl CorrectionUbloxSensor {
         }
         Ok(())
     }
+
+    fn extract_gga_sentence(data: &str) -> Option<String> {
+        let re = Regex::new(r"\$.{0,2}GGA.{0,200}\r\n").unwrap();
+        re.find(&data)
+            .map(|gga_match| gga_match.as_str().to_string())
+    }
+
+    fn parse_to_gga(s: &str) -> Option<GgaData> {
+        let parse_result = nmea::parse_str(s);
+        match parse_result {
+            Ok(ParseResult::GGA(gga_sentence)) => Some(gga_sentence),
+            _ => None,
+        }
+    }
 }
 
-impl Iterator for CorrectionUbloxSensor {
+impl Iterator for NtripUbloxSensor {
     type Item = GgaData;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let gga_sentence = self
+        let gga_string = self
             .gps_sensor
             .next()
-            .and_then(|nmea_sentences| Utils::parse_to_gga(nmea_sentences));
-        if let Some(gga_sentence) = gga_sentence {
+            .and_then(|gps_data| Self::extract_gga_sentence(&gps_data));
+
+        if let Some(gga_string) = gga_string {
             self.apply_available_correction().log_err_unwrap(());
 
-            self.request_new_correction(Utils::clone_gga_data(&gga_sentence))
+            self.request_new_correction(gga_string.clone())
                 .log_err_unwrap(());
 
-            Some(gga_sentence)
+            Self::parse_to_gga(&gga_string)
         } else {
             None
         }
@@ -161,7 +177,7 @@ impl NtripClient {
     /// # Explanation
     /// This function creates a connection with the ntrip caster and then retrieves the correction data
     /// from it.
-    pub fn get_correction(&self, gga_sentence: &GgaData) -> Result<Vec<u8>, Box<dyn Error>> {
+    pub fn get_correction(&self, gga_string: &str) -> io::Result<Vec<u8>> {
         // profile here. maybe dont create a new connection every time?
         let mut stream = TcpStream::connect(format!("{}:{}", self.addr, self.port))?;
         stream.set_read_timeout(Some(Duration::from_secs(10)))?;
@@ -173,14 +189,14 @@ impl NtripClient {
         if Self::is_header_ok(&mut stream)? {
             log::trace!("The connection to the ntrip caster is established.");
 
-            let rtcm_data = Self::read_rtcm(&mut stream, gga_sentence)?;
+            let rtcm_data = Self::read_rtcm(&mut stream, gga_string)?;
             log::trace!("The received rtcm data is {:?}.", rtcm_data);
             Ok(rtcm_data)
         } else {
-            Err(Box::new(io::Error::new(
+            Err(io::Error::new(
                 ErrorKind::ConnectionRefused,
                 "Response did not start with HTTP OK.",
-            )))
+            ))
         }
     }
 
@@ -212,8 +228,7 @@ impl NtripClient {
     /// # Explnation
     /// After authentication a gga-sentence can be sent to the caster.
     /// The returned data then is the rtcm data.
-    fn read_rtcm(stream: &mut TcpStream, gga_sentence: &GgaData) -> io::Result<Vec<u8>> {
-        let gga_string = Utils::gga_data_to_string(&gga_sentence);
+    fn read_rtcm(stream: &mut TcpStream, gga_string: &str) -> io::Result<Vec<u8>> {
         stream.write_all(gga_string.as_bytes())?;
 
         let mut rtcm_buf = vec![];
@@ -233,5 +248,34 @@ impl NtripClient {
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::sensors::ublox::NtripUbloxSensor;
+
+    #[test]
+    fn test_extract_gga() {
+        let sentence =
+            "$GNRMC,185823.40,A,4808.7402374,N,01133.9324760,E,0.00,112.64,130117,3.00,E,A*14\r\n";
+        assert!(NtripUbloxSensor::extract_gga_sentence(sentence).is_none());
+
+        let sentence = "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47\r\n";
+        assert!(NtripUbloxSensor::extract_gga_sentence(sentence).is_some());
+
+        let sentence = "abcdefg";
+        assert!(NtripUbloxSensor::extract_gga_sentence(sentence).is_none());
+
+        let sentence = "$GNGGA,123519.00,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*77\r\n\
+                             $GNRMC,185823.40,A,4808.7402374,N,01133.9324760,E,0.00,112.64,130117,3.00,E,A*14\r\n";
+        assert!(NtripUbloxSensor::extract_gga_sentence(sentence).is_some());
+
+        let sentence = "$GNRMC,185823.40,A,4808.7402374,N,01133.9324760,E,0.00,112.64,130117,3.00,E,A*14\r\n\
+                             $GNGGA,123519.00,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*77\r\n";
+        assert!(NtripUbloxSensor::extract_gga_sentence(sentence).is_some());
+
+        let sentence = "$GNRMC,202521.36,V,,,,,,,090823,,,N,V*1A\r\n";
+        assert!(NtripUbloxSensor::extract_gga_sentence(sentence).is_none());
     }
 }

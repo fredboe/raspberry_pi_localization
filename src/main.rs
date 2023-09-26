@@ -7,7 +7,7 @@ use crate::sensor_utils::velocity::{KinematicState, OrientedVelocity, Velocity};
 use crate::sensors::adafruit::AdafruitDCStepperHat;
 use crate::sensors::bno055::BNO055Compass;
 use crate::sensors::paa5100::PAA5100;
-use crate::sensors::ublox::{CorrectionUbloxSensor, UbloxSensor};
+use crate::sensors::ublox::{NtripUbloxSensor, UbloxSensor};
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{GameLoop, LogErrUnwrap, ParSampler, Utils};
 use gilrs::Button;
@@ -97,7 +97,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error>> {
     let ntrip_client = Utils::get_ntrip_client()?;
     let gps_sensor = UbloxSensor::new("/dev/ttyACM0")?;
-    let mut corrected_gps_sensor = CorrectionUbloxSensor::new(gps_sensor, ntrip_client)
+    let mut corrected_gps_sensor = NtripUbloxSensor::new(gps_sensor, ntrip_client)
         .flat_map(|gga_sentence| GeoCoord::from_gga(gga_sentence));
 
     let base_point = Utils::get_base_point(&mut corrected_gps_sensor);

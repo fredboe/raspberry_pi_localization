@@ -1,9 +1,6 @@
 use crate::sensor_utils::gps::GeoCoord;
 use crate::sensors::ublox::NtripClient;
 use log::LevelFilter;
-use nmea::sentences::GgaData;
-use nmea::ParseResult;
-use regex::Regex;
 use simplelog::{Config, WriteLogger};
 use std::error::Error;
 use std::fmt::Display;
@@ -16,68 +13,6 @@ use std::time::{Duration, Instant};
 pub struct Utils;
 
 impl Utils {
-    /// # Explanation
-    /// This function parses the given buffer to the RMC format.
-    pub fn parse_to_gga(sentences: String) -> Option<GgaData> {
-        let re = Regex::new(r"\$.{0,2}GGA.{0,200}\r\n").unwrap();
-
-        let parse_result = re
-            .find(sentences.as_str())
-            .map(|gga_match| gga_match.as_str().to_string())
-            .and_then(|gga_sentence| nmea::parse_str(gga_sentence.as_str()).ok());
-
-        match parse_result {
-            Some(ParseResult::GGA(gga_sentence)) => Some(gga_sentence),
-            _ => None,
-        }
-    }
-
-    /// # Explanation
-    /// This function generates a nmea gga sentence from the GgaData struct.
-    pub fn gga_data_to_string(gga: &GgaData) -> String {
-        fn checksum(sentence: &str) -> u8 {
-            let mut checksum = 0;
-            for character in sentence.chars().skip(1) {
-                checksum ^= character as u8;
-            }
-            checksum
-        }
-
-        let fix_time = gga
-            .fix_time
-            .map(|t| t.format("%H%M%S.%3f").to_string())
-            .unwrap();
-        let fix_type = gga.fix_type.map(|t| t as u8).unwrap_or(0);
-        let lat = gga.latitude.unwrap_or(0.0);
-        let lon = gga.longitude.unwrap_or(0.0);
-        let fix_satellites = gga.fix_satellites.unwrap_or(0);
-        let hdop = gga.hdop.unwrap_or(0.0);
-        let altitude = gga.altitude.unwrap_or(0.0);
-        let geoid_separation = gga.geoid_separation.unwrap_or(0.0);
-
-        let gga_sentence = format!(
-            "$GNGGA,{},{:02}{:05.2},{},{:03}{:05.2},{},{},{},{},{},M,{},M,,",
-            fix_time,
-            lat.abs().trunc() as u32,
-            lat.abs().fract() * 60.0,
-            if lat >= 0.0 { "N" } else { "S" },
-            lon.abs().trunc() as u32,
-            lon.abs().fract() * 60.0,
-            if lon >= 0.0 { "E" } else { "W" },
-            fix_type,
-            fix_satellites,
-            hdop,
-            altitude,
-            geoid_separation,
-        );
-
-        let checksum = checksum(&gga_sentence);
-
-        let complete_sentence = format!("{}*{:02X}\r\n", gga_sentence, checksum);
-
-        complete_sentence
-    }
-
     /// # Explanation
     /// This function asks the gps sensor_utils permanently for the position and once a position is given it is returned.
     pub fn get_base_point<GPS: Iterator<Item = GeoCoord>>(gps_sensor: &mut GPS) -> GeoCoord {
@@ -142,21 +77,6 @@ impl Utils {
         let log_file = std::fs::File::create("raspberry_pi_localization.log")?;
         WriteLogger::init(log_level, Config::default(), log_file)?;
         Ok(())
-    }
-
-    /// # Explanation
-    /// This function clones the given GgaData object.
-    pub fn clone_gga_data(gga: &GgaData) -> GgaData {
-        GgaData {
-            fix_time: gga.fix_time,
-            fix_type: gga.fix_type,
-            latitude: gga.latitude,
-            longitude: gga.longitude,
-            fix_satellites: gga.fix_satellites,
-            hdop: gga.hdop,
-            altitude: gga.altitude,
-            geoid_separation: gga.geoid_separation,
-        }
     }
 }
 
@@ -309,9 +229,9 @@ impl<Request: Send + 'static, Response: Send + 'static> Requester<Request, Respo
     /// ### Parameter
     /// The parameter f is a function that is executed when a new request comes in
     /// (so this should be a function from Request to Response (Request -> Response)).
-    pub fn new<F>(f: F) -> Self
+    pub fn new<F>(transformer: F) -> Self
     where
-        F: Fn(Request) -> Response + Send + 'static,
+        F: (Fn(Request) -> Response) + Send + 'static,
     {
         let (stop_sender, stop_receiver) = mpsc::channel();
         let (request_sender, request_receiver) = mpsc::channel();
@@ -322,7 +242,7 @@ impl<Request: Send + 'static, Response: Send + 'static> Requester<Request, Respo
             while stop_receiver.try_recv().is_err() {
                 let request = request_receiver.try_recv();
                 if let Ok(request) = request {
-                    let response = f(request);
+                    let response = transformer(request);
                     response_sender.send(response).unwrap_or(());
                 }
             }
