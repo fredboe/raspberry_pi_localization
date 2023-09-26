@@ -59,7 +59,7 @@ impl Utils {
         let geoid_separation = gga.geoid_separation.unwrap_or(0.0);
 
         let gga_sentence = format!(
-            "$GPGGA,{},{:02}{:05.2},{},{:03}{:05.2},{},{},{},{},{},M,{},M,,",
+            "$GNGGA,{},{:02}{:05.2},{},{:03}{:05.2},{},{},{},{},{},M,{},M,,",
             fix_time,
             lat.abs().trunc() as u32,
             lat.abs().fract() * 60.0,
