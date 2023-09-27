@@ -49,9 +49,9 @@ impl Iterator for UbloxSensor {
     fn next(&mut self) -> Option<Self::Item> {
         let nmea_sentences = self
             .read_from_device()
-            .ok()
-            .and_then(|data| String::from_utf8(data).ok());
-        log::trace!("NMEA: {:?}", nmea_sentences);
+            .map(|data| String::from_utf8_lossy(&data).to_string())
+            .ok();
+        log::trace!("Ublox data: {:?}", nmea_sentences);
 
         nmea_sentences
     }
