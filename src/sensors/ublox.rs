@@ -177,7 +177,7 @@ impl NtripClient {
     /// # Explanation
     /// This function creates a connection with the ntrip caster and then retrieves the correction data
     /// from it.
-    pub fn get_correction(&self, gga_string: &str) -> io::Result<Vec<u8>> {
+    pub fn get_correction(&self, message: &str) -> io::Result<Vec<u8>> {
         // profile here. maybe dont create a new connection every time?
         let mut stream = TcpStream::connect(format!("{}:{}", self.addr, self.port))?;
         stream.set_read_timeout(Some(Duration::from_secs(10)))?;
@@ -189,7 +189,7 @@ impl NtripClient {
         if Self::is_header_ok(&mut stream)? {
             log::trace!("The connection to the ntrip caster is established.");
 
-            let rtcm_data = Self::read_rtcm(&mut stream, gga_string)?;
+            let rtcm_data = Self::read_rtcm(&mut stream, message)?;
             log::trace!("The received rtcm data is {:?}.", rtcm_data);
             Ok(rtcm_data)
         } else {
@@ -228,8 +228,9 @@ impl NtripClient {
     /// # Explnation
     /// After authentication a gga-sentence can be sent to the caster.
     /// The returned data then is the rtcm data.
-    fn read_rtcm(stream: &mut TcpStream, gga_string: &str) -> io::Result<Vec<u8>> {
-        stream.write_all(gga_string.as_bytes())?;
+    fn read_rtcm(stream: &mut TcpStream, message: &str) -> io::Result<Vec<u8>> {
+        // check if valid gga sentence
+        stream.write_all(message.as_bytes())?;
 
         let mut rtcm_buf = vec![];
         Self::read_all_available(stream, &mut rtcm_buf)?;

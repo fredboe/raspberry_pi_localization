@@ -98,7 +98,7 @@ fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error
     let ntrip_client = Utils::get_ntrip_client()?;
     let gps_sensor = UbloxSensor::new("/dev/ttyACM0")?;
     let mut corrected_gps_sensor = NtripUbloxSensor::new(gps_sensor, ntrip_client)
-        .flat_map(|gga_sentence| GeoCoord::from_gga(gga_sentence));
+        .filter_map(|gga_sentence| GeoCoord::from_gga(gga_sentence));
 
     let base_point = Utils::get_base_point(&mut corrected_gps_sensor);
     let cartesian_converter = GeoToENU::new(base_point, 0.0);

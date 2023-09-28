@@ -22,13 +22,13 @@ impl Utils {
     fn get_base_point_from_gps_sensor<GPS: Iterator<Item = GeoCoord>>(
         gps_sensor: &mut GPS,
     ) -> GeoCoord {
-        for _ in GameLoop::from_fps(10) {
-            if let Some(position) = gps_sensor.next() {
-                return position;
+        let mut base_point_iterator = GameLoop::from_fps(10).filter_map(|_| gps_sensor.next());
+        loop {
+            let geo_coord = base_point_iterator.next();
+            if let Some(geo_coord) = geo_coord {
+                break geo_coord;
             }
         }
-        // this will not be reached
-        GeoCoord::new(0., 0.)
     }
 
     /// # Explanation
@@ -103,6 +103,7 @@ impl<T, E: Display> LogErrUnwrap<T> for Result<T, E> {
 /// The game loop is an iterator that waits when the next function is called if the execution is faster
 /// than the frame rate allows.
 pub struct GameLoop {
+    frame: u64,
     current_frame_start: Instant,
     duration_per_frame: Duration,
 }
@@ -111,6 +112,7 @@ impl GameLoop {
     pub fn new(duration_per_frame: Duration) -> GameLoop {
         let current_frame_start = Instant::now();
         GameLoop {
+            frame: 0,
             current_frame_start,
             duration_per_frame,
         }
@@ -123,7 +125,7 @@ impl GameLoop {
 }
 
 impl Iterator for GameLoop {
-    type Item = ();
+    type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
         let end_time = self.current_frame_start + self.duration_per_frame;
@@ -135,10 +137,13 @@ impl Iterator for GameLoop {
             log::warn!("The game loop is hanging behind by {:?}.", now - end_time);
         }
 
+        let frame_number = self.frame;
+        self.frame += 1;
+
         let next_frame_start_time = Instant::now();
         self.current_frame_start = next_frame_start_time;
 
-        Some(())
+        Some(frame_number)
     }
 }
 
@@ -240,7 +245,7 @@ impl<Request: Send + 'static, Response: Send + 'static> Requester<Request, Respo
         // maybe later use of a thread pool
         let worker = std::thread::spawn(move || {
             while stop_receiver.try_recv().is_err() {
-                let request = request_receiver.try_recv();
+                let request = request_receiver.recv_timeout(Duration::from_millis(10));
                 if let Ok(request) = request {
                     let response = transformer(request);
                     response_sender.send(response).unwrap_or(());
