@@ -1,5 +1,5 @@
 use crate::sensor_utils::gps::GeoCoord;
-use crate::sensors::ublox::NtripClient;
+use crate::sensor_utils::gps_utils::NtripClient;
 use log::LevelFilter;
 use simplelog::{Config, WriteLogger};
 use std::error::Error;
