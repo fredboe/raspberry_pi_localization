@@ -58,7 +58,7 @@ impl Iterator for UbloxSensor {
 /// This struct represents a ublox gps sensor that corrects the gps data with rtcm data (via ntrip).
 pub struct NtripUbloxSensor {
     gps_sensor: UbloxSensor,
-    ntrip_requester: Requester<String, Vec<Vec<u8>>>,
+    ntrip_requester: Requester<String, Vec<u8>>,
     last_time: Instant,
 }
 
@@ -86,11 +86,13 @@ impl NtripUbloxSensor {
     }
 
     fn apply_available_correction(&mut self) -> io::Result<()> {
-        for rtcm_messages in self.ntrip_requester.get_responses() {
-            for rtcm_message in rtcm_messages {
-                self.gps_sensor.apply_correction(&rtcm_message)?;
-            }
-        }
+        let corrections: Vec<u8> = self
+            .ntrip_requester
+            .get_responses()
+            .into_iter()
+            .flatten()
+            .collect();
+        self.gps_sensor.apply_correction(&corrections)?;
         Ok(())
     }
 
