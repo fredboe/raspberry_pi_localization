@@ -2,7 +2,8 @@ use crate::actions::{perform_action, Action};
 use crate::deciders::{Decider, FollowJoystick};
 use crate::filter::model::{ConstantVelocity, MeasureAllModel, XYMeasurementModel};
 use crate::filter::track::{GaussianState, KalmanTrack};
-use crate::sensor_utils::gps::{Cartesian2D, GeoCoord, GeoToCartesian, GeoToENU};
+use crate::sensor_utils::coordinates::{Cartesian2D, GeoCoord, GeoToCartesian, GeoToENU};
+use crate::sensor_utils::gps_utils::NtripClient;
 use crate::sensor_utils::velocity::{KinematicState, OrientedVelocity, Velocity};
 use crate::sensors::adafruit::AdafruitDCStepperHat;
 use crate::sensors::bno055::BNO055Compass;
@@ -95,10 +96,11 @@ fn run() -> Result<(), Box<dyn Error>> {
 }
 
 fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error>> {
-    let ntrip_client = Utils::get_ntrip_client()?;
-    let gps_sensor = UbloxSensor::new("/dev/ttyACM0")?;
-    let mut corrected_gps_sensor = NtripUbloxSensor::new(gps_sensor, ntrip_client)
-        .filter_map(|gga_sentence| GeoCoord::from_gga(gga_sentence));
+    let ntrip_settings = Utils::get_ntrip_client()?;
+    let gps_sensor = UbloxSensor::new("/dev/ttyACM0", 38400)?;
+    let mut corrected_gps_sensor =
+        NtripUbloxSensor::new(gps_sensor, NtripClient::new(ntrip_settings))
+            .filter_map(|gga_sentence| GeoCoord::from_gga(gga_sentence));
 
     let base_point = Utils::get_base_point(&mut corrected_gps_sensor);
     let cartesian_converter = GeoToENU::new(base_point, 0.0);

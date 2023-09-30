@@ -8,23 +8,15 @@ use std::io::{BufReader, ErrorKind, Read, Write};
 use std::net::TcpStream;
 use std::time::Duration;
 
-/// # Explanation
-/// The ntrip client struct is used to create requests to a ntrip caster. For this the (ip) address of
-/// the caster is required as well as the port. Furthermore, a mountpoint, an username and a password is required.
-///
-/// The ntrip client first sends a http header to authenticate itself. Then with the open socket a
-/// gga-sentence is sent and the caster then sends back the rtcm data (correction data).
-pub struct NtripClient {
-    addr: String,
-    port: u16,
-    mountpoint: String,
-    username: String,
-    password: String,
+pub struct NtripClientSettings {
+    pub addr: String,
+    pub port: u16,
+    pub mountpoint: String,
+    pub username: String,
+    pub password: String,
 }
 
-impl NtripClient {
-    const MAX_READ_SIZE: u64 = 65536;
-
+impl NtripClientSettings {
     pub fn new(
         addr: String,
         port: u16,
@@ -32,7 +24,7 @@ impl NtripClient {
         username: String,
         password: String,
     ) -> Self {
-        NtripClient {
+        NtripClientSettings {
             addr,
             port,
             mountpoint,
@@ -40,13 +32,32 @@ impl NtripClient {
             password,
         }
     }
+}
+
+/// # Explanation
+/// The ntrip client struct is used to create requests to a ntrip caster. For this the (ip) address of
+/// the caster is required as well as the port. Furthermore, a mountpoint, an username and a password is required.
+///
+/// The ntrip client first sends a http header to authenticate itself. Then with the open socket a
+/// gga-sentence is sent and the caster then sends back the rtcm data (correction data).
+pub struct NtripClient {
+    settings: NtripClientSettings,
+}
+
+impl NtripClient {
+    const MAX_READ_SIZE: u64 = 65536;
+
+    pub fn new(settings: NtripClientSettings) -> Self {
+        NtripClient { settings }
+    }
 
     /// # Explanation
     /// This function creates a connection with the ntrip caster and then retrieves the correction data
     /// from it.
     pub fn get_correction(&self, message: &str) -> io::Result<Vec<u8>> {
         // profile here. maybe dont create a new connection every time?
-        let mut stream = TcpStream::connect(format!("{}:{}", self.addr, self.port))?;
+        let mut stream =
+            TcpStream::connect(format!("{}:{}", self.settings.addr, self.settings.port))?;
         stream.set_read_timeout(Some(Duration::from_secs(10)))?;
         stream.set_write_timeout(Some(Duration::from_secs(10)))?;
 
@@ -74,11 +85,14 @@ impl NtripClient {
             Host: {}:{}\r\n\
             Ntrip-Version: Ntrip/2.0\r\n\
             Authorization: Basic {}\r\n\r\n",
-            self.mountpoint,
-            self.username,
-            self.addr,
-            self.port,
-            STANDARD.encode(format!("{}:{}", self.username, self.password))
+            self.settings.mountpoint,
+            self.settings.username,
+            self.settings.addr,
+            self.settings.port,
+            STANDARD.encode(format!(
+                "{}:{}",
+                self.settings.username, self.settings.password
+            ))
         )
     }
 

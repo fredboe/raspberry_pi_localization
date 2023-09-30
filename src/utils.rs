@@ -1,5 +1,5 @@
-use crate::sensor_utils::gps::GeoCoord;
-use crate::sensor_utils::gps_utils::NtripClient;
+use crate::sensor_utils::coordinates::GeoCoord;
+use crate::sensor_utils::gps_utils::NtripClientSettings;
 use log::LevelFilter;
 use simplelog::{Config, WriteLogger};
 use std::error::Error;
@@ -55,14 +55,16 @@ impl Utils {
     /// # Explanation
     /// This function returns an ntrip client with the settings based on the following environment variables:
     /// NTRIP_ADDR, NTRIP_PORT (needs to be a u16), NTRIP_MOUNTPOINT, NTRIP_USERNAME, NTRIP_PASSWORD.
-    pub fn get_ntrip_client() -> Result<NtripClient, Box<dyn Error>> {
+    pub fn get_ntrip_client() -> Result<NtripClientSettings, Box<dyn Error>> {
         let addr = std::env::var("NTRIP_ADDR")?;
         let port = std::env::var("NTRIP_PORT")?.parse()?;
         let mountpoint = std::env::var("NTRIP_MOUNTPOINT")?;
         let username = std::env::var("NTRIP_USERNAME")?;
         let password = std::env::var("NTRIP_PASSWORD")?;
 
-        Ok(NtripClient::new(addr, port, mountpoint, username, password))
+        Ok(NtripClientSettings::new(
+            addr, port, mountpoint, username, password,
+        ))
     }
 
     /// # Explanation

@@ -16,8 +16,8 @@ pub struct UbloxSensor {
 }
 
 impl UbloxSensor {
-    pub fn new(path: &str) -> Result<Self, serialport::Error> {
-        let port = serialport::new(path, 38400).open()?;
+    pub fn new(path: &str, baud_rate: u32) -> Result<Self, serialport::Error> {
+        let port = serialport::new(path, baud_rate).open()?;
         Ok(UbloxSensor { port })
     }
 
