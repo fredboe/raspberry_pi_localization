@@ -1,12 +1,17 @@
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine;
+use bytes::Bytes;
+use futures::StreamExt;
 use nmea::sentences::GgaData;
 use nmea::ParseResult;
 use regex::Regex;
+use reqwest::header::{AUTHORIZATION, HOST, USER_AGENT};
+use reqwest::{Client, RequestBuilder, Response};
+use std::error::Error;
 use std::io;
-use std::io::{BufReader, ErrorKind, Read, Write};
-use std::net::TcpStream;
-use std::time::Duration;
+use std::io::ErrorKind;
+use tokio::runtime::Runtime;
+use tokio::sync::mpsc::Sender;
 
 pub struct NtripClientSettings {
     pub addr: String,
@@ -14,6 +19,7 @@ pub struct NtripClientSettings {
     pub mountpoint: String,
     pub username: String,
     pub password: String,
+    pub initial_gga_sentence: String,
 }
 
 impl NtripClientSettings {
@@ -23,6 +29,7 @@ impl NtripClientSettings {
         mountpoint: String,
         username: String,
         password: String,
+        initial_gga_sentence: String,
     ) -> Self {
         NtripClientSettings {
             addr,
@@ -30,6 +37,7 @@ impl NtripClientSettings {
             mountpoint,
             username,
             password,
+            initial_gga_sentence,
         }
     }
 }
@@ -38,101 +46,84 @@ impl NtripClientSettings {
 /// The ntrip client struct is used to create requests to a ntrip caster. For this the (ip) address of
 /// the caster is required as well as the port. Furthermore, a mountpoint, an username and a password is required.
 ///
-/// The ntrip client first sends a http header to authenticate itself. Then with the open socket a
-/// gga-sentence is sent and the caster then sends back the rtcm data (correction data).
-pub struct NtripClient {
-    settings: NtripClientSettings,
-}
+/// The ntrip client first sends a http header to authenticate itself and send an initial nmea gga sentence.
+/// Then with the open socket the caster sends back the rtcm data (correction data).
+pub struct NtripClient;
 
 impl NtripClient {
-    const MAX_READ_SIZE: u64 = 65536;
-
-    pub fn new(settings: NtripClientSettings) -> Self {
-        NtripClient { settings }
+    pub fn run(settings: NtripClientSettings, sender: Sender<Bytes>) {
+        std::thread::spawn(move || {
+            let runtime = Runtime::new().unwrap();
+            runtime.block_on(async move {
+                Self::do_rtcm_exchange(settings, sender)
+                    .await
+                    .unwrap_or_else(|error| log::error!("NTRIP client error: {:?}", error))
+            })
+        });
     }
 
-    /// # Explanation
-    /// This function creates a connection with the ntrip caster and then retrieves the correction data
-    /// from it.
-    pub fn get_correction(&self, message: &str) -> io::Result<Vec<u8>> {
-        // profile here. maybe dont create a new connection every time?
-        let mut stream =
-            TcpStream::connect(format!("{}:{}", self.settings.addr, self.settings.port))?;
-        stream.set_read_timeout(Some(Duration::from_secs(10)))?;
-        stream.set_write_timeout(Some(Duration::from_secs(10)))?;
+    async fn do_rtcm_exchange(
+        settings: NtripClientSettings,
+        sender: Sender<Bytes>,
+    ) -> Result<(), Box<dyn Error>> {
+        let request = Self::create_request(&settings);
+        let response = request.send().await?;
 
-        let request = self.create_request();
-        stream.write_all(request.as_bytes())?;
-
-        if Self::is_header_ok(&mut stream)? {
-            log::trace!("The connection to the ntrip caster is established.");
-
-            let rtcm_data = Self::read_rtcm(&mut stream, message)?;
-            log::trace!("The received rtcm data is {:?}.", rtcm_data);
-            Ok(rtcm_data)
+        if response.status() == 200 {
+            Self::send_rtcm_messages_from_stream(response, sender).await?;
+            Ok(())
         } else {
-            Err(io::Error::new(
-                ErrorKind::ConnectionRefused,
-                "Response did not start with HTTP OK.",
-            ))
+            Err(Box::new(io::Error::new(
+                ErrorKind::NotConnected,
+                format!(
+                    "HTTP response code was different than 200. It was {}.",
+                    response.status()
+                ),
+            )))
         }
     }
 
-    fn create_request(&self) -> String {
-        format!(
-            "GET /{} HTTP/1.1\r\n\
-            User-Agent: {}\r\n\
-            Host: {}:{}\r\n\
-            Ntrip-Version: Ntrip/2.0\r\n\
-            Authorization: Basic {}\r\n\r\n",
-            self.settings.mountpoint,
-            self.settings.username,
-            self.settings.addr,
-            self.settings.port,
-            STANDARD.encode(format!(
-                "{}:{}",
-                self.settings.username, self.settings.password
-            ))
-        )
-    }
-
     /// # Explanation
-    /// Check if the response of the caster consists of a HTTP-OK header (status code 200).
-    fn is_header_ok(stream: &mut TcpStream) -> io::Result<bool> {
-        let mut header = vec![];
-        Self::read_all_available(stream, &mut header)?;
-        let header = String::from_utf8(header).unwrap();
-
-        Ok(header.starts_with("HTTP/1.1 200"))
-    }
-
-    /// # Explnation
-    /// After authentication a gga-sentence can be sent to the caster.
-    /// The returned data then is the rtcm data.
-    fn read_rtcm(stream: &mut TcpStream, message: &str) -> io::Result<Vec<u8>> {
-        if is_gga_sentence(message) {
-            stream.write_all(message.as_bytes())?;
-
-            let mut rtcm_buf = vec![];
-            Self::read_all_available(stream, &mut rtcm_buf)?;
-            Ok(rtcm_buf)
-        } else {
-            Ok(vec![])
+    /// This function reads the byte stream from the response and sends the bytes (rtcm messages) over the channel.
+    async fn send_rtcm_messages_from_stream(
+        response: Response,
+        sender: Sender<Bytes>,
+    ) -> Result<(), Box<dyn Error>> {
+        if response.status() != 200 {
+            return Ok(());
         }
-    }
 
-    fn read_all_available(stream: &TcpStream, buf: &mut Vec<u8>) -> io::Result<()> {
-        let mut reader = BufReader::new(stream).take(Self::MAX_READ_SIZE);
-
-        const BLOCK_SIZE: usize = 1024;
-        let mut bytes_read = BLOCK_SIZE;
-        let mut intermediate_buf = [0u8; BLOCK_SIZE];
-        while bytes_read == BLOCK_SIZE {
-            bytes_read = reader.read(&mut intermediate_buf)?;
-            buf.extend_from_slice(&intermediate_buf[0..bytes_read]);
+        let mut bytes_stream = response.bytes_stream();
+        while let Some(rtcm_message) = bytes_stream.next().await {
+            if let Ok(rtcm_message) = rtcm_message {
+                sender.send(rtcm_message).await?;
+            }
         }
 
         Ok(())
+    }
+
+    /// # Explanation
+    /// This function creates the http request that is send to the ntrip caster.
+    fn create_request(settings: &NtripClientSettings) -> RequestBuilder {
+        let host = format!("{}:{}", settings.addr, settings.port);
+        let url = format!("http://{}/{}", host, settings.mountpoint);
+        let credentials_base64 = format!(
+            "Basic {}",
+            STANDARD.encode(format!("{}:{}", settings.username, settings.password))
+        );
+
+        let client = Client::new();
+
+        let request = client
+            .get(url)
+            .header(USER_AGENT, &settings.username)
+            .header(HOST, &host)
+            .header("Ntrip-Version", "Ntrip/2.0")
+            .header("Ntrip-GGA", &settings.initial_gga_sentence)
+            .header(AUTHORIZATION, credentials_base64);
+
+        request
     }
 }
 
@@ -152,10 +143,6 @@ pub fn parse_to_gga(s: &str) -> Option<GgaData> {
         Ok(ParseResult::GGA(gga_sentence)) => Some(gga_sentence),
         _ => None,
     }
-}
-
-pub fn is_gga_sentence(s: &str) -> bool {
-    parse_to_gga(s).is_some()
 }
 
 #[cfg(test)]

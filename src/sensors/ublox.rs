@@ -1,12 +1,13 @@
 use crate::sensor_utils::gps_utils;
-use crate::sensor_utils::gps_utils::NtripClient;
-use crate::utils::{LogErrUnwrap, Requester};
+use crate::sensor_utils::gps_utils::{NtripClient, NtripClientSettings};
+use crate::utils::LogErrUnwrap;
+use bytes::Bytes;
 use nmea::sentences::GgaData;
 use serialport::SerialPort;
 use std::io;
 use std::io::{Read, Write};
-use std::sync::mpsc::SendError;
-use std::time::{Duration, Instant};
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::Receiver;
 
 /// # Explanation
 /// This is a simple interface to an ublox gps sensor that is connected via usb. With this interface
@@ -58,49 +59,23 @@ impl Iterator for UbloxSensor {
 /// This struct represents a ublox gps sensor that corrects the gps data with rtcm data (via ntrip).
 pub struct NtripUbloxSensor {
     gps_sensor: UbloxSensor,
-    ntrip_requester: Requester<String, Vec<u8>>,
-    last_time: Instant,
+    rtcm_receiver: Receiver<Bytes>,
 }
 
 impl NtripUbloxSensor {
-    const DURATION_BETWEEN_CORRECTION: Duration = Duration::from_secs(2);
-
-    pub fn new(gps_sensor: UbloxSensor, ntrip_client: NtripClient) -> Self {
-        let ntrip_requester = Requester::new(move |gga_string: String| {
-            ntrip_client
-                .get_correction(&gga_string)
-                .unwrap_or_else(|error| {
-                    log::info!(
-                        "Error with accessing the rtcm data via ntrip. The error was: {}",
-                        error
-                    );
-                    vec![]
-                })
-        });
+    pub fn new(gps_sensor: UbloxSensor, ntrip_settings: NtripClientSettings) -> Self {
+        let (rtcm_sender, rtcm_receiver) = mpsc::channel(128);
+        NtripClient::run(ntrip_settings, rtcm_sender);
 
         NtripUbloxSensor {
             gps_sensor,
-            ntrip_requester,
-            last_time: Instant::now() - Self::DURATION_BETWEEN_CORRECTION,
+            rtcm_receiver,
         }
     }
 
     fn apply_available_correction(&mut self) -> io::Result<()> {
-        let corrections: Vec<u8> = self
-            .ntrip_requester
-            .get_responses()
-            .into_iter()
-            .flatten()
-            .collect();
-        self.gps_sensor.apply_correction(&corrections)?;
-        Ok(())
-    }
-
-    fn request_new_correction(&mut self, gga_sentence: String) -> Result<(), SendError<String>> {
-        let now = Instant::now();
-        if now - self.last_time >= Self::DURATION_BETWEEN_CORRECTION {
-            self.last_time = now;
-            self.ntrip_requester.request(gga_sentence)?;
+        while let Ok(rtcm_message) = self.rtcm_receiver.try_recv() {
+            self.gps_sensor.apply_correction(&rtcm_message)?;
         }
         Ok(())
     }
@@ -117,10 +92,6 @@ impl Iterator for NtripUbloxSensor {
 
         if let Some(gga_string) = gga_string {
             self.apply_available_correction().log_err_unwrap(());
-
-            self.request_new_correction(gga_string.clone())
-                .log_err_unwrap(());
-
             gps_utils::parse_to_gga(&gga_string)
         } else {
             None

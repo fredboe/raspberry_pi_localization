@@ -1,12 +1,13 @@
 use crate::sensor_utils::coordinates::GeoCoord;
-use crate::sensor_utils::gps_utils::NtripClientSettings;
+use crate::sensor_utils::gps_utils::{extract_gga_sentence, NtripClientSettings};
+use crate::sensors::ublox::UbloxSensor;
 use log::LevelFilter;
 use simplelog::{Config, WriteLogger};
 use std::error::Error;
 use std::fmt::Display;
 use std::str::FromStr;
 use std::sync::mpsc;
-use std::sync::mpsc::{Receiver, SendError, Sender};
+use std::sync::mpsc::{Receiver, Sender};
 use std::thread::JoinHandle;
 use std::time::{Duration, Instant};
 
@@ -55,16 +56,38 @@ impl Utils {
     /// # Explanation
     /// This function returns an ntrip client with the settings based on the following environment variables:
     /// NTRIP_ADDR, NTRIP_PORT (needs to be a u16), NTRIP_MOUNTPOINT, NTRIP_USERNAME, NTRIP_PASSWORD.
-    pub fn get_ntrip_client() -> Result<NtripClientSettings, Box<dyn Error>> {
+    pub fn get_ntrip_settings(
+        gps_sensor: &mut UbloxSensor,
+    ) -> Result<NtripClientSettings, Box<dyn Error>> {
         let addr = std::env::var("NTRIP_ADDR")?;
         let port = std::env::var("NTRIP_PORT")?.parse()?;
         let mountpoint = std::env::var("NTRIP_MOUNTPOINT")?;
         let username = std::env::var("NTRIP_USERNAME")?;
         let password = std::env::var("NTRIP_PASSWORD")?;
+        let initial_gga_sentence = Self::get_gga_sentence_from_sensor(gps_sensor);
 
         Ok(NtripClientSettings::new(
-            addr, port, mountpoint, username, password,
+            addr,
+            port,
+            mountpoint,
+            username,
+            password,
+            initial_gga_sentence,
         ))
+    }
+
+    fn get_gga_sentence_from_sensor(gps_sensor: &mut UbloxSensor) -> String {
+        let gga_sentence = loop {
+            let gga_sentence = gps_sensor
+                .next()
+                .and_then(|gps_data| extract_gga_sentence(&gps_data));
+
+            if let Some(gga_sentence) = gga_sentence {
+                break gga_sentence;
+            }
+        };
+
+        gga_sentence
     }
 
     /// # Explanation
@@ -211,73 +234,6 @@ impl<T> Drop for ParSampler<T> {
         self.stop_sender.send(Stop).expect(ERR_MSG);
 
         if let Some(handle) = self.handle.take() {
-            handle.join().expect(ERR_MSG);
-        }
-    }
-}
-
-/// # Explanation
-/// This struct can be used to create requests (and access the responses) in a non-blocking way.
-/// The struct works by having a worker thread (maybe later a thread pool) that performs all the
-/// requests. The requests and the responses are moved with channels.
-///
-/// This struct is mainly used in the ntrip client struct.
-pub struct Requester<Request, Response> {
-    stop_sender: Sender<Stop>,
-    request_sender: Sender<Request>,
-    response_receiver: Receiver<Response>,
-    worker_handle: Option<JoinHandle<()>>,
-}
-
-impl<Request: Send + 'static, Response: Send + 'static> Requester<Request, Response> {
-    /// # Explanation
-    /// This function creates a new Requester.
-    ///
-    /// ### Parameter
-    /// The parameter f is a function that is executed when a new request comes in
-    /// (so this should be a function from Request to Response (Request -> Response)).
-    pub fn new<F>(transformer: F) -> Self
-    where
-        F: (Fn(Request) -> Response) + Send + 'static,
-    {
-        let (stop_sender, stop_receiver) = mpsc::channel();
-        let (request_sender, request_receiver) = mpsc::channel();
-        let (response_sender, response_receiver) = mpsc::channel();
-
-        // maybe later use of a thread pool
-        let worker = std::thread::spawn(move || {
-            while stop_receiver.try_recv().is_err() {
-                let request = request_receiver.recv_timeout(Duration::from_millis(10));
-                if let Ok(request) = request {
-                    let response = transformer(request);
-                    response_sender.send(response).unwrap_or(());
-                }
-            }
-        });
-
-        Requester {
-            stop_sender,
-            request_sender,
-            response_receiver,
-            worker_handle: Some(worker),
-        }
-    }
-
-    pub fn request(&mut self, request: Request) -> Result<(), SendError<Request>> {
-        self.request_sender.send(request)
-    }
-
-    pub fn get_responses(&mut self) -> Vec<Response> {
-        self.response_receiver.try_iter().collect()
-    }
-}
-
-impl<X, Y> Drop for Requester<X, Y> {
-    fn drop(&mut self) {
-        const ERR_MSG: &str = "Requester: Could not terminate the worker thread.";
-        self.stop_sender.send(Stop).expect(ERR_MSG);
-
-        if let Some(handle) = self.worker_handle.take() {
             handle.join().expect(ERR_MSG);
         }
     }
