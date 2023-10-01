@@ -13,6 +13,7 @@ use std::io::ErrorKind;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc::Sender;
 
+#[derive(Debug)]
 pub struct NtripClientSettings {
     pub addr: String,
     pub port: u16,
@@ -106,8 +107,10 @@ impl NtripClient {
     /// # Explanation
     /// This function creates the http request that is send to the ntrip caster.
     fn create_request(settings: &NtripClientSettings) -> RequestBuilder {
-        let host = format!("{}:{}", settings.addr, settings.port);
-        let url = format!("http://{}/{}", host, settings.mountpoint);
+        let url = format!(
+            "http://{}:{}/{}",
+            settings.addr, settings.port, settings.mountpoint
+        );
         let credentials_base64 = format!(
             "Basic {}",
             STANDARD.encode(format!("{}:{}", settings.username, settings.password))
@@ -118,9 +121,15 @@ impl NtripClient {
         let request = client
             .get(url)
             .header(USER_AGENT, &settings.username)
-            .header(HOST, &host)
+            .header(HOST, &settings.addr)
             .header("Ntrip-Version", "Ntrip/2.0")
-            .header("Ntrip-GGA", &settings.initial_gga_sentence)
+            .header(
+                "Ntrip-GGA",
+                &settings
+                    .initial_gga_sentence
+                    .replace("\r", "")
+                    .replace("\n", ""),
+            )
             .header(AUTHORIZATION, credentials_base64);
 
         request
