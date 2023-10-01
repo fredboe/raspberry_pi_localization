@@ -1,5 +1,5 @@
-use crate::sensor_utils::gps_utils;
-use crate::sensor_utils::gps_utils::{NtripClient, NtripClientSettings};
+use crate::sensor_utils::gps;
+use crate::sensor_utils::gps::{NtripClient, NtripClientSettings};
 use crate::utils::LogErrUnwrap;
 use bytes::Bytes;
 use nmea::sentences::GgaData;
@@ -92,11 +92,11 @@ impl Iterator for NtripUbloxSensor {
         let gga_string = self
             .gps_sensor
             .next()
-            .and_then(|gps_data| gps_utils::extract_gga_sentence(&gps_data));
+            .and_then(|gps_data| gps::extract_gga_sentence(&gps_data));
 
         if let Some(gga_string) = gga_string {
             self.apply_available_correction().log_err_unwrap(());
-            gps_utils::parse_to_gga(&gga_string)
+            gps::parse_to_gga(&gga_string)
         } else {
             None
         }

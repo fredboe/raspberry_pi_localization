@@ -156,29 +156,29 @@ pub fn parse_to_gga(s: &str) -> Option<GgaData> {
 
 #[cfg(test)]
 mod tests {
-    use crate::sensor_utils::gps_utils;
+    use crate::sensor_utils::gps;
 
     #[test]
     fn test_extract_gga() {
         let sentence =
             "$GNRMC,185823.40,A,4808.7402374,N,01133.9324760,E,0.00,112.64,130117,3.00,E,A*14\r\n";
-        assert!(gps_utils::extract_gga_sentence(sentence).is_none());
+        assert!(gps::extract_gga_sentence(sentence).is_none());
 
         let sentence = "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47\r\n";
-        assert!(gps_utils::extract_gga_sentence(sentence).is_some());
+        assert!(gps::extract_gga_sentence(sentence).is_some());
 
         let sentence = "abcdefg";
-        assert!(gps_utils::extract_gga_sentence(sentence).is_none());
+        assert!(gps::extract_gga_sentence(sentence).is_none());
 
         let sentence = "$GNGGA,123519.00,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*77\r\n\
                              $GNRMC,185823.40,A,4808.7402374,N,01133.9324760,E,0.00,112.64,130117,3.00,E,A*14\r\n";
-        assert!(gps_utils::extract_gga_sentence(sentence).is_some());
+        assert!(gps::extract_gga_sentence(sentence).is_some());
 
         let sentence = "$GNRMC,185823.40,A,4808.7402374,N,01133.9324760,E,0.00,112.64,130117,3.00,E,A*14\r\n\
                              $GNGGA,123519.00,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*77\r\n";
-        assert!(gps_utils::extract_gga_sentence(sentence).is_some());
+        assert!(gps::extract_gga_sentence(sentence).is_some());
 
         let sentence = "$GNRMC,202521.36,V,,,,,,,090823,,,N,V*1A\r\n";
-        assert!(gps_utils::extract_gga_sentence(sentence).is_none());
+        assert!(gps::extract_gga_sentence(sentence).is_none());
     }
 }

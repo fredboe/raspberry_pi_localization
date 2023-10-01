@@ -1,3 +1,3 @@
 pub mod coordinates;
-pub mod gps_utils;
+pub mod gps;
 pub mod velocity;

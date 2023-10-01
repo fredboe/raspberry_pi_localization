@@ -1,5 +1,5 @@
 use crate::sensor_utils::coordinates::GeoCoord;
-use crate::sensor_utils::gps_utils::{extract_gga_sentence, NtripClientSettings};
+use crate::sensor_utils::gps::{extract_gga_sentence, NtripClientSettings};
 use crate::sensors::ublox::UbloxSensor;
 use log::LevelFilter;
 use simplelog::{Config, WriteLogger};
@@ -180,7 +180,6 @@ struct Stop;
 ///
 /// The ParSampler keeps the values as a state so that always the last value the iterator returned can be accessed.
 pub struct ParSampler<T> {
-    state: Option<T>,
     stop_sender: Sender<Stop>,
     state_receiver: Receiver<Option<T>>,
     handle: Option<JoinHandle<()>>,
@@ -206,7 +205,6 @@ impl<T: Send + 'static> ParSampler<T> {
         });
 
         ParSampler {
-            state: None,
             stop_sender,
             state_receiver,
             handle: Some(handle),
@@ -218,13 +216,14 @@ impl<T: Clone> Iterator for ParSampler<T> {
     type Item = T;
 
     fn next(&mut self) -> Option<Self::Item> {
+        let mut current_state = None;
         while let Ok(state) = self.state_receiver.try_recv() {
             if state.is_some() {
-                self.state = state;
+                current_state = state;
             }
         }
 
-        self.state.clone()
+        current_state
     }
 }
 

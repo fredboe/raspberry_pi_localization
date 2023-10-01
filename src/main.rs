@@ -22,8 +22,9 @@ mod sensors;
 mod user_input;
 mod utils;
 
+const SAMPLE_RATE: usize = 4;
 const GPS_ERROR: f64 = 3.0;
-const VEL_ERROR: f64 = 0.1;
+const VEL_ERROR: f64 = 0.05;
 const DRIFT: f64 = 0.16;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -53,7 +54,7 @@ fn run() -> Result<(), Box<dyn Error>> {
 
     let position_sensor = initialize_position_sensor()?;
     let velocity_sensor = initialize_velocity_sensor()?;
-    let mut sensors = position_sensor.zip(velocity_sensor);
+    let mut sensors = ParSampler::new(SAMPLE_RATE, position_sensor.zip(velocity_sensor));
 
     let mut track = initialize_kalman_track_measure_all();
 
@@ -84,7 +85,7 @@ fn run() -> Result<(), Box<dyn Error>> {
                 .log_err_unwrap(());
 
             perform_action(Action::Idle, &mut adafruit_dc_controller).log_err_unwrap(());
-            std::process::exit(0);
+            break;
         }
 
         let action = follow_joystick.decide(&user_input);
@@ -94,7 +95,7 @@ fn run() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error>> {
+fn initialize_position_sensor() -> Result<impl Iterator<Item = Cartesian2D>, Box<dyn Error>> {
     let mut gps_sensor = UbloxSensor::new("/dev/ttyACM0", 38400)?;
 
     let ntrip_settings = Utils::get_ntrip_settings(&mut gps_sensor)?;
@@ -106,10 +107,11 @@ fn initialize_position_sensor() -> Result<ParSampler<Cartesian2D>, Box<dyn Error
     let position_sensor = corrected_gps_sensor
         .map(move |geo_coord| cartesian_converter.convert(geo_coord, 0.0).into());
 
-    Ok(ParSampler::new(4, position_sensor))
+    //Ok(ParSampler::new(SAMPLE_RATE, position_sensor))
+    Ok(position_sensor)
 }
 
-fn initialize_velocity_sensor() -> Result<ParSampler<Velocity>, Box<dyn Error>> {
+fn initialize_velocity_sensor() -> Result<impl Iterator<Item = Velocity>, Box<dyn Error>> {
     let height = Utils::get_height()?;
     let mut orientation_sensor = BNO055Compass::new(0x28)?;
     orientation_sensor.apply_calibration(&Utils::get_calibration()?)?;
@@ -117,7 +119,8 @@ fn initialize_velocity_sensor() -> Result<ParSampler<Velocity>, Box<dyn Error>> 
     let oriented_velocity_sensor =
         OrientedVelocity::new(orientation_sensor, distance_traveled_sensor);
 
-    Ok(ParSampler::new(4, oriented_velocity_sensor))
+    //Ok(ParSampler::new(SAMPLE_RATE, oriented_velocity_sensor))
+    Ok(oriented_velocity_sensor)
 }
 
 #[allow(dead_code)]
