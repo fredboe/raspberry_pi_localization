@@ -74,9 +74,13 @@ impl NtripUbloxSensor {
     }
 
     fn apply_available_correction(&mut self) -> io::Result<()> {
+        let mut rtcm_messages = vec![];
         while let Ok(rtcm_message) = self.rtcm_receiver.try_recv() {
-            self.gps_sensor.apply_correction(&rtcm_message)?;
+            rtcm_messages.push(rtcm_message);
         }
+
+        let rtcm_data: Vec<u8> = rtcm_messages.into_iter().flatten().collect();
+        self.gps_sensor.apply_correction(&rtcm_data)?;
         Ok(())
     }
 }
