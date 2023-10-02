@@ -18,7 +18,7 @@ impl Utils {
     /// This function asks the gps sensor_utils permanently for the position and once a position is given it is returned.
     pub fn get_base_point<GPS: Iterator<Item = GeoCoord>>(gps_sensor: &mut GPS) -> GeoCoord {
         Self::get_base_point_from_env_vars()
-            .unwrap_or(Self::get_base_point_from_gps_sensor(gps_sensor))
+            .unwrap_or_else(|| Self::get_base_point_from_gps_sensor(gps_sensor))
     }
 
     fn get_base_point_from_gps_sensor<GPS: Iterator<Item = GeoCoord>>(

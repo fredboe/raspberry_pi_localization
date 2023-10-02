@@ -28,9 +28,6 @@ const GPS_ERROR: f64 = 3.0;
 const VEL_ERROR: f64 = 0.1;
 const DRIFT: f64 = 0.16;
 
-const CALIBRATION_NUM_STEPS: usize = 30;
-const CALIBRATION_WAIT_TIME: Duration = Duration::from_secs(1);
-
 fn main() -> Result<(), Box<dyn Error>> {
     Utils::logger_init()?;
     log::info!("Robot started");
@@ -113,7 +110,7 @@ fn initialize_position_sensor() -> Result<impl Iterator<Item = Cartesian2D>, Box
     let position_sensor = corrected_gps_sensor
         .map(move |geo_coord| cartesian_converter.convert(geo_coord, 0.0).into());
 
-    //Ok(ParSampler::new(SAMPLE_RATE, position_sensor))
+    // Ok(ParSampler::new(SAMPLE_RATE, position_sensor))
     Ok(position_sensor)
 }
 
@@ -125,7 +122,7 @@ fn initialize_velocity_sensor() -> Result<impl Iterator<Item = Velocity2D>, Box<
     let oriented_velocity_sensor =
         OrientedVelocity::new(orientation_sensor, distance_traveled_sensor);
 
-    //Ok(ParSampler::new(SAMPLE_RATE, oriented_velocity_sensor))
+    // Ok(ParSampler::new(SAMPLE_RATE, oriented_velocity_sensor))
     Ok(oriented_velocity_sensor)
 }
 
@@ -179,8 +176,19 @@ fn get_initial_measurement<T, S: Iterator<Item = T>>(sensors: &mut S) -> T {
 }
 
 fn sensor_calibration_phase<T, S: Iterator<Item = T>>(sensors: &mut S) {
-    for _ in 0..CALIBRATION_NUM_STEPS {
+    let calibration_repetitions: usize = std::env::var("CALIBRATION_REPETITIONS")
+        .ok()
+        .and_then(|repetitions| repetitions.parse().ok())
+        .unwrap_or(30);
+    let calibration_wait_time: Duration = Duration::from_secs_f32(
+        std::env::var("CALIBRATION_WAIT_TIME")
+            .ok()
+            .and_then(|wait_time| wait_time.parse().ok())
+            .unwrap_or(1.0),
+    );
+
+    for _ in 0..calibration_repetitions {
         let _ = sensors.next();
-        std::thread::sleep(CALIBRATION_WAIT_TIME);
+        std::thread::sleep(calibration_wait_time);
     }
 }
