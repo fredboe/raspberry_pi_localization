@@ -26,19 +26,25 @@ impl DistanceMM {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub struct Velocity {
-    vx: f64,
-    vy: f64,
+pub struct Velocity2D {
+    pub vx: f64,
+    pub vy: f64,
+}
+
+impl Velocity2D {
+    pub fn new(vx: f64, vy: f64) -> Self {
+        Velocity2D { vx, vy }
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
 pub struct KinematicState {
     position: Cartesian2D,
-    velocity: Velocity,
+    velocity: Velocity2D,
 }
 
 impl KinematicState {
-    pub fn new(position: Cartesian2D, velocity: Velocity) -> Self {
+    pub fn new(position: Cartesian2D, velocity: Velocity2D) -> Self {
         KinematicState { position, velocity }
     }
 }
@@ -51,12 +57,6 @@ impl Into<SVector<f64, 4>> for KinematicState {
             self.velocity.vx,
             self.velocity.vy,
         )
-    }
-}
-
-impl Velocity {
-    pub fn new(vx: f64, vy: f64) -> Self {
-        Velocity { vx, vy }
     }
 }
 
@@ -79,7 +79,7 @@ impl<O, F> OrientedVelocity<O, F> {
 impl<O: Iterator<Item = Orientation>, F: Iterator<Item = DistanceMM>> Iterator
     for OrientedVelocity<O, F>
 {
-    type Item = Velocity;
+    type Item = Velocity2D;
 
     fn next(&mut self) -> Option<Self::Item> {
         let orientation = self.orientation_sensor.next();
@@ -91,7 +91,7 @@ impl<O: Iterator<Item = Orientation>, F: Iterator<Item = DistanceMM>> Iterator
             self.last_time = now;
 
             // velocity in local frame
-            let v_local = Velocity::new(
+            let v_local = Velocity2D::new(
                 distance_mm.dx * 0.001 / time_passed.as_secs_f64(),
                 distance_mm.dy * 0.001 / time_passed.as_secs_f64(),
             );
@@ -100,7 +100,7 @@ impl<O: Iterator<Item = Orientation>, F: Iterator<Item = DistanceMM>> Iterator
             let vx = v_local.vx * orientation.radian.cos() + v_local.vy * orientation.radian.sin();
             let vy = -v_local.vx * orientation.radian.sin() + v_local.vy * orientation.radian.cos();
 
-            Some(Velocity::new(vx, vy))
+            Some(Velocity2D::new(vx, vy))
         } else {
             None
         }

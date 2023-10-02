@@ -3,7 +3,7 @@ use crate::deciders::{Decider, FollowJoystick};
 use crate::filter::model::{ConstantVelocity, MeasureAllModel, XYMeasurementModel};
 use crate::filter::track::{GaussianState, KalmanTrack};
 use crate::sensor_utils::coordinates::{Cartesian2D, GeoCoord, GeoToCartesian, GeoToENU};
-use crate::sensor_utils::velocity::{KinematicState, OrientedVelocity, Velocity};
+use crate::sensor_utils::velocity::{KinematicState, OrientedVelocity, Velocity2D};
 use crate::sensors::adafruit::AdafruitDCStepperHat;
 use crate::sensors::bno055::BNO055Compass;
 use crate::sensors::paa5100::PAA5100;
@@ -13,6 +13,7 @@ use crate::utils::{GameLoop, LogErrUnwrap, ParSampler, Utils};
 use gilrs::Button;
 use nalgebra::{SMatrix, SVector, Vector4};
 use std::error::Error;
+use std::time::Duration;
 
 mod actions;
 mod deciders;
@@ -24,8 +25,11 @@ mod utils;
 
 const SAMPLE_RATE: usize = 4;
 const GPS_ERROR: f64 = 3.0;
-const VEL_ERROR: f64 = 0.05;
+const VEL_ERROR: f64 = 0.1;
 const DRIFT: f64 = 0.16;
+
+const CALIBRATION_NUM_STEPS: usize = 30;
+const CALIBRATION_WAIT_TIME: Duration = Duration::from_secs(1);
 
 fn main() -> Result<(), Box<dyn Error>> {
     Utils::logger_init()?;
@@ -55,8 +59,10 @@ fn run() -> Result<(), Box<dyn Error>> {
     let position_sensor = initialize_position_sensor()?;
     let velocity_sensor = initialize_velocity_sensor()?;
     let mut sensors = ParSampler::new(SAMPLE_RATE, position_sensor.zip(velocity_sensor));
+    sensor_calibration_phase(&mut sensors);
 
-    let mut track = initialize_kalman_track_measure_all();
+    let initial_measurement = get_initial_measurement(&mut sensors);
+    let mut track = initialize_kalman_track_measure_all(initial_measurement);
 
     println!("The robot is now drivable.");
 
@@ -111,7 +117,7 @@ fn initialize_position_sensor() -> Result<impl Iterator<Item = Cartesian2D>, Box
     Ok(position_sensor)
 }
 
-fn initialize_velocity_sensor() -> Result<impl Iterator<Item = Velocity>, Box<dyn Error>> {
+fn initialize_velocity_sensor() -> Result<impl Iterator<Item = Velocity2D>, Box<dyn Error>> {
     let height = Utils::get_height()?;
     let mut orientation_sensor = BNO055Compass::new(0x28)?;
     orientation_sensor.apply_calibration(&Utils::get_calibration()?)?;
@@ -141,9 +147,16 @@ fn initialize_kalman_track_xy(
 
 #[allow(dead_code)]
 fn initialize_kalman_track_measure_all(
+    measurement: (Cartesian2D, Velocity2D),
 ) -> KalmanTrack<4, 4, KinematicState, ConstantVelocity, MeasureAllModel<4>> {
+    let (initial_position, initial_velocity) = measurement;
     let initial_state = GaussianState::<4>::new(
-        SVector::zeros(),
+        SVector::<f64, 4>::from_column_slice(&[
+            initial_position.x,
+            initial_position.y,
+            initial_velocity.vx,
+            initial_velocity.vy,
+        ]),
         SMatrix::from_diagonal(&Vector4::new(GPS_ERROR, GPS_ERROR, 0., 0.)),
     );
     let track = KalmanTrack::new(
@@ -155,4 +168,19 @@ fn initialize_kalman_track_measure_all(
     );
 
     track
+}
+
+fn get_initial_measurement<T, S: Iterator<Item = T>>(sensors: &mut S) -> T {
+    loop {
+        if let Some(measurement) = sensors.next() {
+            break measurement;
+        }
+    }
+}
+
+fn sensor_calibration_phase<T, S: Iterator<Item = T>>(sensors: &mut S) {
+    for _ in 0..CALIBRATION_NUM_STEPS {
+        let _ = sensors.next();
+        std::thread::sleep(CALIBRATION_WAIT_TIME);
+    }
 }
