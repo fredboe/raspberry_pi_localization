@@ -17,7 +17,8 @@ impl Utils {
     /// # Explanation
     /// This function asks the gps sensor_utils permanently for the position and once a position is given it is returned.
     pub fn get_base_point<GPS: Iterator<Item = GeoCoord>>(gps_sensor: &mut GPS) -> GeoCoord {
-        Self::get_base_point_from_gps_sensor(gps_sensor)
+        Self::get_base_point_from_env_vars()
+            .unwrap_or(Self::get_base_point_from_gps_sensor(gps_sensor))
     }
 
     fn get_base_point_from_gps_sensor<GPS: Iterator<Item = GeoCoord>>(
@@ -29,6 +30,20 @@ impl Utils {
             if let Some(geo_coord) = geo_coord {
                 break geo_coord;
             }
+        }
+    }
+
+    fn get_base_point_from_env_vars() -> Option<GeoCoord> {
+        let base_point_lon = std::env::var("BASE_POINT_LON")
+            .ok()
+            .and_then(|lon| lon.parse().ok());
+        let base_point_lat = std::env::var("BASE_POINT_LAT")
+            .ok()
+            .and_then(|lat| lat.parse().ok());
+
+        match (base_point_lon, base_point_lat) {
+            (Some(lon), Some(lat)) => Some(GeoCoord::new(lon, lat)),
+            _ => None,
         }
     }
 
