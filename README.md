@@ -13,7 +13,7 @@ Then in the end the calculated track is plotted and stored in a file so that som
 
 ![](images/robot_side_1.JPEG)
 
-![](images/robot_side_2.JPEG)
+![](images/robot_top_1.JPEG)
 
 #### Controlling the robot
 The robot is controllable via a video game controller that is connected with bluetooth.
