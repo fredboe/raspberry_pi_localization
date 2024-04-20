@@ -1,39 +1,6 @@
 use std::error::Error;
 
-/// # Explanation
-/// The MotorController trait is a trait that can be used to implement a struct that (like the name says)
-/// controls a robot.
-pub trait MotorController<ERR: Error> {
-    fn set_speed(&mut self, motor_id: u8, speed: f32) -> Result<(), ERR>;
-
-    fn set_direction(&mut self, motor_id: u8, direction: Directions) -> Result<(), ERR>;
-
-    fn run(&mut self, motor_id: u8, direction: Directions, speed: f32) -> Result<(), ERR> {
-        self.set_direction(motor_id, direction)?;
-        self.set_speed(motor_id, speed)
-    }
-}
-
-/// # Explanation
-/// The directions enum consists of all the modes a motor can have (FORWARD, BACKWARD and BREAK).
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum Directions {
-    FORWARD,
-    BACKWARD,
-    BREAK,
-}
-
-impl From<f32> for Directions {
-    /// # Explanation
-    /// If value >= 0 then FORWARD else BACKWARD
-    fn from(value: f32) -> Self {
-        if value >= 0.0 {
-            Directions::FORWARD
-        } else {
-            Directions::BACKWARD
-        }
-    }
-}
+use sensors::motor::{Directions, MotorController};
 
 /// # Explanation
 /// The action enum contains all possible actions the robot can perform. Currently it is Idle (not moving)
@@ -73,8 +40,11 @@ pub fn perform_action<ERR: Error, M: MotorController<ERR>>(
 
 #[cfg(test)]
 mod tests {
-    use crate::actions::{perform_action, Action, Directions, MotorController};
     use std::fmt::Error;
+
+    use sensors::motor::{Directions, MotorController};
+
+    use crate::actions::{Action, perform_action};
 
     struct MockMotorController {
         motors: [(Directions, f32); 4],

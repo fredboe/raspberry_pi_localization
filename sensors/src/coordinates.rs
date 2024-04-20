@@ -36,6 +36,18 @@ impl GeoCoord {
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct Velocity2D {
+    pub vx: f64,
+    pub vy: f64,
+}
+
+impl Velocity2D {
+    pub fn new(vx: f64, vy: f64) -> Self {
+        Velocity2D { vx, vy }
+    }
+}
+
 /// # Explanation
 /// The Cartesian2D struct represents a point in a cartesian coordinate system with two dimensions.
 #[derive(Debug, Copy, Clone)]

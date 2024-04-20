@@ -11,12 +11,12 @@ use nalgebra::{SMatrix, SVector};
 pub trait LinearTransitionModel<const D: usize> {
     /// # Returns
     /// Returns the transition matrix when dt is the time that has passed since the last
-    /// measurement.
+    /// sensors.
     fn transition_matrix(&self, dt: Duration) -> SMatrix<f64, D, D>;
 
     /// # Returns
     /// Returns the error matrix when dt is the time that has passed since the last
-    /// measurement.
+    /// sensors.
     fn transition_error(&self, dt: Duration) -> SMatrix<f64, D, D>;
 }
 
@@ -68,24 +68,24 @@ impl LinearTransitionModel<4> for ConstantVelocity {
 }
 
 /// # Explanation
-/// The measurement matrix that transforms the state into the measurement space.
-/// The measurement error represents the possible error that a measurement can have.
+/// The sensors matrix that transforms the state into the sensors space.
+/// The sensors error represents the possible error that a sensors can have.
 ///
 /// # Type parameters
 /// SD is the dimension of the state (eg four for the constant velocity model). MD is the dimension
-/// of the measurement vectors.
+/// of the sensors vectors.
 pub trait LinearMeasurementModel<const SD: usize, const MD: usize> {
     /// # Returns
-    /// Returns the measurement matrix.
+    /// Returns the sensors matrix.
     fn measurement_matrix(&self) -> SMatrix<f64, MD, SD>;
 
     /// # Returns
-    /// Returns the measurement error.
+    /// Returns the sensors error.
     fn measurement_error(&self) -> SMatrix<f64, MD, MD>;
 }
 
 /// # Explanation
-/// The xy measurement model assumes that only the position is measured so that the measurement dimension
+/// The xy sensors model assumes that only the position is measured so that the sensors dimension
 /// is two (x, y).
 ///
 /// # Parameters
@@ -116,7 +116,7 @@ impl<const SD: usize> LinearMeasurementModel<SD, 2> for XYMeasurementModel<SD> {
 }
 
 /// # Explanation
-/// The MeasureAllModel assumes that all state variables are also measured (so the measurement matrix is the
+/// The MeasureAllModel assumes that all state variables are also measured (so the sensors matrix is the
 /// identity matrix). The error matrix is a diagonal matrix.
 pub struct MeasureAllModel<const D: usize> {
     measurement_matrix: SMatrix<f64, D, D>,

@@ -1,4 +1,3 @@
-use crate::filter::model::{LinearMeasurementModel, LinearTransitionModel};
 use nalgebra::{SMatrix, SVector};
 use plotters::prelude::{
     BitMapBackend, ChartBuilder, IntoDrawingArea, IntoFont, LineSeries, GREEN, RED, WHITE,
@@ -8,6 +7,7 @@ use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
 use chrono::{DateTime, Duration, Utc};
+use crate::kalman::model::{LinearMeasurementModel, LinearTransitionModel};
 
 /// # Explanation
 /// The gaussian state consists of the expected state (vector) and the uncertainty (covariance matrix).
@@ -28,11 +28,11 @@ impl<const D: usize> GaussianState<D> {
 
 /// # Explanation
 /// A waypoint is a position the object has been at a specific time (or at least that is what we assume).
-/// In order to make smoothing and plotting easier the waypoint also contains the measurement and the prediction.
+/// In order to make smoothing and plotting easier the waypoint also contains the sensors and the prediction.
 ///
 /// # Type parameters
 /// SD is the dimension of the state (eg four for the constant velocity model). MD is the dimension
-/// of the measurement vectors.
+/// of the sensors vectors.
 #[derive(Debug, Copy, Clone)]
 pub struct Waypoint<const SD: usize, const MD: usize> {
     timestamp: DateTime<Utc>,
@@ -69,7 +69,7 @@ impl Display for KalmanError {
             KalmanError::InversionFailure => write!(f, "The matrix inversion failed."),
             KalmanError::NotInitialized => write!(
                 f,
-                "In order to add a measurement the track needs to have an initial state."
+                "In order to add a sensors the track needs to have an initial state."
             ),
         }
     }
@@ -78,12 +78,12 @@ impl Display for KalmanError {
 impl Error for KalmanError {}
 
 /// # Explanation
-/// The KalmanTrack is a track where each incoming measurement is filtered with a kalman filter.
-/// It consists of a transition model and a measurement model.
+/// The KalmanTrack is a track where each incoming sensors is filtered with a kalman filter.
+/// It consists of a transition model and a sensors model.
 ///
 /// # Type parameters
 /// SD is the dimension of the state (eg four for the constant velocity model). MD is the dimension
-/// of the measurement vectors (the measurement needs to be converted into a vector in order to be
+/// of the sensors vectors (the sensors needs to be converted into a vector in order to be
 /// processable). The type M is the type of the incoming measurements (it needs to be convertable to a vector so that
 /// the kalman filter can work with it).
 pub struct KalmanTrack<const STATE_DIM: usize, const MEAS_DIM: usize, M, TransModel, MeasModel> {
@@ -127,7 +127,7 @@ where
     }
 
     /// # Explanation
-    /// This function adds a new measurement to the track.
+    /// This function adds a new sensors to the track.
     /// Before it is added to the track, it is filtered by a kalman filter.
     pub fn new_measurement(&mut self, measurement: M) -> Result<(), KalmanError> {
         if self.track.len() == 0 {
@@ -163,8 +163,8 @@ where
     }
 
     /// # Explanation
-    /// This function performs a filter operation on the prediction with the given measurement
-    /// and the measurement model.
+    /// This function performs a filter operation on the prediction with the given sensors
+    /// and the sensors model.
     fn filter(
         &self,
         prediction: &GaussianState<STATE_DIM>,
@@ -231,8 +231,8 @@ where
     /// TRACK_X is the index of the x-axis in the state vector.
     /// TRACK_Y is the index of the y-axis in the state vector.
     ///
-    /// MEAS_X is the index of the x-axis in the measurement vector.
-    /// MEAS_Y is the index of the y-axis in the measurement vector.
+    /// MEAS_X is the index of the x-axis in the sensors vector.
+    /// MEAS_Y is the index of the y-axis in the sensors vector.
     pub fn plot_track<
         const TRACK_X: usize,
         const TRACK_Y: usize,

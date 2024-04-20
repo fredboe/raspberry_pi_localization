@@ -1,39 +1,22 @@
-use crate::sensor_utils::velocity::DistanceMM;
-use spidev::{SpiModeFlags, Spidev, SpidevOptions, SpidevTransfer};
 use std::io;
 use std::io::ErrorKind;
-use std::time::Duration;
+use std::time::{Duration, Instant};
+use spidev::{Spidev, SpidevOptions, SpidevTransfer, SpiModeFlags};
 
-#[derive(Debug)]
-pub struct MotionBurst {
-    pub delta_x: i16,
-    pub delta_y: i16,
-    pub squal: u8,
-    pub raw_sum: u8,
-    pub raw_max: u8,
-    pub raw_min: u8,
-    pub shutter: u16,
+pub trait DistanceTraveledSensor: Iterator<Item = Distance2D> {}
+
+#[derive(Copy, Clone, Debug)]
+pub struct Distance2D {
+    pub dx: f64,
+    pub dy: f64,
 }
 
-impl From<[u8; 13]> for MotionBurst {
-    fn from(value: [u8; 13]) -> Self {
-        let delta_x = i16::from_be_bytes([value[4], value[3]]);
-        let delta_y = i16::from_be_bytes([value[6], value[5]]);
-        let squal = value[7];
-        let (raw_sum, raw_max, raw_min) = (value[8], value[9], value[10]);
-        let shutter = u16::from_be_bytes([value[12], value[11]]);
-
-        MotionBurst {
-            delta_x,
-            delta_y,
-            squal,
-            raw_sum,
-            raw_max,
-            raw_min,
-            shutter,
-        }
+impl Distance2D {
+    pub fn new(dx: f64, dy: f64) -> Self {
+        Self { dx, dy }
     }
 }
+
 
 pub struct PAA5100 {
     mm_per_pixel: f64,
@@ -53,7 +36,7 @@ impl PAA5100 {
             .build();
         spi.configure(&options)?;
 
-        let mut paa5100 = PAA5100 { mm_per_pixel, spi };
+        let mut paa5100 = Self { mm_per_pixel, spi };
 
         paa5100.write_one_reg(0x3A, 0x5A)?; // restart register
 
@@ -229,7 +212,7 @@ impl PAA5100 {
         Ok(MotionBurst::from(read_buf))
     }
 
-    pub fn get_distance(&mut self) -> io::Result<DistanceMM> {
+    fn get_distance(&mut self) -> io::Result<Distance2D> {
         let motion = self.get_motion()?;
         let squal = motion.squal;
         let shutter = motion.shutter;
@@ -249,7 +232,7 @@ impl PAA5100 {
             let dx_mm = dx_pixel as f64 * self.mm_per_pixel;
             let dy_mm = dy_pixel as f64 * self.mm_per_pixel;
 
-            Ok(DistanceMM::new(dx_mm, dy_mm))
+            Ok(Distance2D::new(dx_mm / 1000.0, dy_mm / 1000.0))
         }
     }
 
@@ -279,11 +262,43 @@ impl PAA5100 {
 }
 
 impl Iterator for PAA5100 {
-    type Item = DistanceMM; // distance traveled in mm
+    type Item = Distance2D; // distance traveled
 
     fn next(&mut self) -> Option<Self::Item> {
         let distance = self.get_distance();
         log::trace!("Distance traveled (PAA5100): {:?}", distance);
         distance.ok()
+    }
+}
+
+
+#[derive(Debug)]
+pub struct MotionBurst {
+    pub delta_x: i16,
+    pub delta_y: i16,
+    pub squal: u8,
+    pub raw_sum: u8,
+    pub raw_max: u8,
+    pub raw_min: u8,
+    pub shutter: u16,
+}
+
+impl From<[u8; 13]> for MotionBurst {
+    fn from(value: [u8; 13]) -> Self {
+        let delta_x = i16::from_be_bytes([value[4], value[3]]);
+        let delta_y = i16::from_be_bytes([value[6], value[5]]);
+        let squal = value[7];
+        let (raw_sum, raw_max, raw_min) = (value[8], value[9], value[10]);
+        let shutter = u16::from_be_bytes([value[12], value[11]]);
+
+        Self {
+            delta_x,
+            delta_y,
+            squal,
+            raw_sum,
+            raw_max,
+            raw_min,
+            shutter,
+        }
     }
 }
