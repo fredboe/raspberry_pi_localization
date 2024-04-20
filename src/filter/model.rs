@@ -1,5 +1,5 @@
+use chrono::Duration;
 use nalgebra::{SMatrix, SVector};
-use std::time::Duration;
 
 /// # Explanation
 /// The LinearTransitionModel should contain the transition model (so the transition matrix and the error matrix).
@@ -41,7 +41,7 @@ impl LinearTransitionModel<4> for ConstantVelocity {
     /// | 0.  0.  1.  0. |<br>
     /// | 0.  0.  0.  1. |<br>
     fn transition_matrix(&self, dt: Duration) -> SMatrix<f64, 4, 4> {
-        let dt = dt.as_secs_f64();
+        let dt = dt.num_milliseconds() as f64 / 1000.0;
         SMatrix::<f64, 4, 4>::new(
             1., 0., dt, 0., 0., 1., 0., dt, 0., 0., 1., 0., 0., 0., 0., 1.,
         )
@@ -54,7 +54,7 @@ impl LinearTransitionModel<4> for ConstantVelocity {
     /// | dt^3/2      0  dt^2          0 |<br>
     /// |     0  dt^3/2       0     dt^2 |<br>
     fn transition_error(&self, dt: Duration) -> SMatrix<f64, 4, 4> {
-        let dt = dt.as_secs_f64();
+        let dt = dt.num_milliseconds() as f64 / 1000.0;
 
         let pow4 = dt.powi(4) / 4.;
         let pow3 = dt.powi(3) / 2.;

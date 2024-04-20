@@ -7,7 +7,7 @@ use std::cmp::Ordering;
 use std::error::Error;
 use std::fmt::{Display, Formatter};
 use std::marker::PhantomData;
-use std::time::{Duration, Instant};
+use chrono::{DateTime, Duration, Utc};
 
 /// # Explanation
 /// The gaussian state consists of the expected state (vector) and the uncertainty (covariance matrix).
@@ -35,7 +35,7 @@ impl<const D: usize> GaussianState<D> {
 /// of the measurement vectors.
 #[derive(Debug, Copy, Clone)]
 pub struct Waypoint<const SD: usize, const MD: usize> {
-    timestamp: Instant,
+    timestamp: DateTime<Utc>,
     measurement: SVector<f64, MD>,
     prediction: GaussianState<SD>,
     estimate: GaussianState<SD>,
@@ -43,7 +43,7 @@ pub struct Waypoint<const SD: usize, const MD: usize> {
 
 impl<const SD: usize, const MD: usize> Waypoint<SD, MD> {
     pub fn new(
-        timestamp: Instant,
+        timestamp: DateTime<Utc>,
         measurement: SVector<f64, MD>,
         prediction: GaussianState<SD>,
         estimate: GaussianState<SD>,
@@ -106,7 +106,7 @@ where
         measurement_model: MeasModel,
     ) -> Self {
         let track = vec![Waypoint::new(
-            Instant::now(),
+            Utc::now(),
             SVector::zeros(),
             initial_state,
             initial_state,
@@ -133,7 +133,7 @@ where
         if self.track.len() == 0 {
             Err(KalmanError::NotInitialized)
         } else {
-            let timestamp = Instant::now();
+            let timestamp = Utc::now();
             let prior = self.track.last().unwrap();
             let dt = timestamp - prior.timestamp;
 
