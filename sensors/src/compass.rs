@@ -1,11 +1,13 @@
 use std::io;
 use std::io::ErrorKind;
-use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
+
 use i2cdev::core::I2CDevice;
+use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
+use serde::{Deserialize, Serialize};
 
 pub trait Compass: Iterator<Item = Orientation> {}
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Orientation {
     pub radian: f64,
 }
@@ -15,8 +17,6 @@ impl Orientation {
         Self { radian }
     }
 }
-
-
 
 /// # Explanation
 /// This is a simple implementation to interact with the BNO055 sensor_utils.

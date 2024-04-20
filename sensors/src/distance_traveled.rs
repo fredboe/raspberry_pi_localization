@@ -1,11 +1,13 @@
 use std::io;
 use std::io::ErrorKind;
 use std::time::{Duration, Instant};
+
+use serde::{Deserialize, Serialize};
 use spidev::{Spidev, SpidevOptions, SpidevTransfer, SpiModeFlags};
 
 pub trait DistanceTraveledSensor: Iterator<Item = Distance2D> {}
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Distance2D {
     pub dx: f64,
     pub dy: f64,
@@ -16,7 +18,6 @@ impl Distance2D {
         Self { dx, dy }
     }
 }
-
 
 pub struct PAA5100 {
     mm_per_pixel: f64,
@@ -270,7 +271,6 @@ impl Iterator for PAA5100 {
         distance.ok()
     }
 }
-
 
 #[derive(Debug)]
 pub struct MotionBurst {

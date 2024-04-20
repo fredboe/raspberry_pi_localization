@@ -1,5 +1,6 @@
 use nalgebra::{Matrix3, SVector, Vector3};
 use nmea::sentences::GgaData;
+use serde::{Deserialize, Serialize};
 
 pub trait GeoToCartesian {
     fn convert(&self, geo_coord: GeoCoord, height: f64) -> Cartesian3D;
@@ -7,7 +8,7 @@ pub trait GeoToCartesian {
 
 /// # Explanation
 /// The GeoCoord struct represents a geographical coordinate (consisting of longitude and latitude).
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct GeoCoord {
     pub lon: f64,
     pub lat: f64,
@@ -36,7 +37,7 @@ impl GeoCoord {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct KinematicState {
     position: Cartesian2D,
     velocity: Velocity2D,
@@ -59,7 +60,7 @@ impl Into<SVector<f64, 4>> for KinematicState {
     }
 }
 
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Velocity2D {
     pub vx: f64,
     pub vy: f64,
@@ -73,7 +74,7 @@ impl Velocity2D {
 
 /// # Explanation
 /// The Cartesian2D struct represents a point in a cartesian coordinate system with two dimensions.
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Cartesian2D {
     pub x: f64,
     pub y: f64,
@@ -93,7 +94,7 @@ impl Into<SVector<f64, 2>> for Cartesian2D {
     }
 }
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
 pub struct Cartesian3D {
     pub x: f64,
     pub y: f64,

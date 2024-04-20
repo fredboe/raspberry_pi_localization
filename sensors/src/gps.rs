@@ -69,7 +69,7 @@ impl Iterator for UbloxSensor {
     }
 }
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct NtripClientSettings {
     pub addr: String,
     pub port: u16,

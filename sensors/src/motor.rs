@@ -1,6 +1,8 @@
 use std::error::Error;
+
 use i2cdev::core::*;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
+use serde::{Deserialize, Serialize};
 
 /// # Explanation
 /// The MotorController trait is a trait that can be used to implement a struct that (like the name says)
@@ -18,7 +20,7 @@ pub trait MotorController<ERR: Error> {
 
 /// # Explanation
 /// The directions enum consists of all the modes a motor can have (FORWARD, BACKWARD and BREAK).
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize)]
 pub enum Directions {
     FORWARD,
     BACKWARD,
@@ -36,8 +38,6 @@ impl From<f32> for Directions {
         }
     }
 }
-
-
 
 /// # Explanation
 /// This is a simple implementation to work with the Adafruit DC & Stepper Motor HAT for Raspberry Pi.

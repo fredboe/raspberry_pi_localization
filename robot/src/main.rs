@@ -1,6 +1,8 @@
 use std::error::Error;
+use std::fs::File;
 use std::str::FromStr;
 
+use csv::Writer;
 use gilrs::Button;
 use log::LevelFilter;
 use nalgebra::{SMatrix, SVector, Vector4};
@@ -55,6 +57,8 @@ fn run(
     sensor_parameters: SensorParameterConfig,
     model_parameters: ModelParameterConfig,
 ) -> Result<(), Box<dyn Error>> {
+    let mut measurements_writer = Writer::from_writer(File::create("measurements.csv")?);
+
     let mut motor_controller = AdafruitDCStepperHat::new(0x60)?;
     let mut user_input_unit = UserInputUnit::new()?;
     let mut follow_joystick = FollowJoystick::new();
@@ -74,6 +78,10 @@ fn run(
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
 
         sensors.next().map(|(position, velocity)| {
+            measurements_writer
+                .serialize((position, velocity))
+                .unwrap_or(()); // + timestamp
+
             log::info!(
                 "The robot is at {:?} with a velocity of {:?}.",
                 position,
@@ -92,6 +100,7 @@ fn run(
                 .plot_track::<0, 1, 0, 1>("track_smoothed.png")
                 .unwrap_or(());
 
+            measurements_writer.flush()?;
             perform_action(Action::Idle, &mut motor_controller).unwrap_or(());
             break;
         }
