@@ -1,37 +1,43 @@
 use std::error::Error;
+use std::str::FromStr;
 
 use gilrs::Button;
+use log::LevelFilter;
 use nalgebra::{SMatrix, SVector, Vector4};
+use simplelog::WriteLogger;
 
 use sensor_fusion::kalman::model::{ConstantVelocity, MeasureAllModel, XYMeasurementModel};
 use sensor_fusion::kalman::track::{GaussianState, KalmanTrack};
 use sensors::{SimplePositionSensor, SimpleVelocitySensor};
 use sensors::compass::BNO055;
-use sensors::coordinates::{Cartesian2D, Velocity2D};
+use sensors::coordinates::{Cartesian2D, KinematicState, Velocity2D};
 use sensors::distance_traveled::PAA5100;
-use sensors::gps::{NtripClientSettings, NtripUbloxSensor, UbloxSensor};
+use sensors::gps::{NtripUbloxSensor, UbloxSensor};
 use sensors::motor::AdafruitDCStepperHat;
 
 use crate::actions::{Action, perform_action};
+use crate::config::{Config, ModelParameterConfig, SensorParameterConfig};
 use crate::deciders::{Decider, FollowJoystick};
 use crate::user_input::{UserInput, UserInputUnit};
 use crate::utils::{GameLoop, ParSampler};
 
 mod actions;
+mod config;
 mod deciders;
 mod user_input;
 mod utils;
 
-const SAMPLE_RATE: usize = 4;
-const GPS_ERROR: f64 = 3.0;
-const VEL_ERROR: f64 = 0.1;
-const DRIFT: f64 = 0.16;
-
 fn main() -> Result<(), Box<dyn Error>> {
+    let config: Config = toml::from_str(&std::fs::read_to_string("config.toml")?)?;
+
+    let log_level = LevelFilter::from_str(&config.log_level)?;
+    let log_file = std::fs::File::create("raspberry_pi_localization.log")?;
+    WriteLogger::init(log_level, simplelog::Config::default(), log_file)?;
+
     // log init
     log::info!("Robot started");
 
-    let result = run();
+    let result = run(config.sensor_parameters, config.model_parameters);
     if let Err(e) = result {
         log::error!("{}", e);
         Err(e)
@@ -45,32 +51,22 @@ fn main() -> Result<(), Box<dyn Error>> {
 /// The run function first initializes the gps sensor_utils, the motor controller, the decider and the track.
 /// Then for every "frame" in the game loop the user input is retrieved; the gps sensor_utils is asked for
 /// the position which is then added to the track and in the end the action the decider returned is executed.
-fn run() -> Result<(), Box<dyn Error>> {
+fn run(
+    sensor_parameters: SensorParameterConfig,
+    model_parameters: ModelParameterConfig,
+) -> Result<(), Box<dyn Error>> {
     let mut motor_controller = AdafruitDCStepperHat::new(0x60)?;
     let mut user_input_unit = UserInputUnit::new()?;
     let mut follow_joystick = FollowJoystick::new();
 
-    let position_sensor = SimplePositionSensor::new(NtripUbloxSensor::new(
-        UbloxSensor::new("/dev/ttyACM0", 38400)?,
-        NtripClientSettings::new(
-            String::new(),
-            1,
-            String::new(),
-            String::new(),
-            String::new(),
-            String::new(),
-        ),
-    ));
-    let velocity_sensor =
-        SimpleVelocitySensor::new(BNO055::new(0x28)?, PAA5100::new("/dev/spidev0.1", 35.0)?);
-    let mut sensors = ParSampler::new(10, position_sensor.zip(velocity_sensor));
+    let mut sensors = initialize_sensors(sensor_parameters)?;
 
     let initial_measurement = loop {
         if let Some(measurement) = sensors.next() {
             break measurement;
         }
     };
-    let mut track = initialize_kalman_track_measure_all(initial_measurement);
+    let mut track = initialize_kalman_track_measure_all(model_parameters, initial_measurement);
 
     println!("The robot is now drivable.");
 
@@ -107,40 +103,48 @@ fn run() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
-#[derive(Debug, Copy, Clone)]
-pub struct KinematicState {
-    position: Cartesian2D,
-    velocity: Velocity2D,
-}
+fn initialize_sensors(
+    sensors_parameters: SensorParameterConfig,
+) -> Result<ParSampler<(Cartesian2D, Velocity2D)>, Box<dyn Error>> {
+    let ublox_sensor = UbloxSensor::new("/dev/ttyACM0", 38400)?;
+    let mut bno055 = BNO055::new(0x28)?;
+    bno055
+        .apply_calibration(&sensors_parameters.compass_calibration)
+        .unwrap_or(());
+    let paa5100 = PAA5100::new(
+        "/dev/spidev0.1",
+        sensors_parameters.optical_flow_sensor_height_mm,
+    )?;
 
-impl KinematicState {
-    pub fn new(position: Cartesian2D, velocity: Velocity2D) -> Self {
-        KinematicState { position, velocity }
-    }
-}
+    let ntrip_ublox_sensor = NtripUbloxSensor::new(ublox_sensor, sensors_parameters.ntrip_settings);
+    let position_sensor = SimplePositionSensor::new(ntrip_ublox_sensor);
 
-impl Into<SVector<f64, 4>> for KinematicState {
-    fn into(self) -> SVector<f64, 4> {
-        SVector::<f64, 4>::new(
-            self.position.x,
-            self.position.y,
-            self.velocity.vx,
-            self.velocity.vy,
-        )
-    }
+    let velocity_sensor = SimpleVelocitySensor::new(bno055, paa5100);
+    let sensors = ParSampler::new(10, position_sensor.zip(velocity_sensor));
+
+    Ok(sensors)
 }
 
 #[allow(dead_code)]
 fn initialize_kalman_track_xy(
+    model_parameters: ModelParameterConfig,
 ) -> KalmanTrack<4, 2, Cartesian2D, ConstantVelocity, XYMeasurementModel<4>> {
     let initial_state = GaussianState::<4>::new(
         SVector::zeros(),
-        SMatrix::from_diagonal(&Vector4::new(GPS_ERROR, GPS_ERROR, 0., 0.)),
+        SMatrix::from_diagonal(&Vector4::new(
+            model_parameters.position_error,
+            model_parameters.position_error,
+            0.,
+            0.,
+        )),
     );
     let track = KalmanTrack::new(
         initial_state,
-        ConstantVelocity::new(DRIFT),
-        XYMeasurementModel::new(GPS_ERROR, GPS_ERROR),
+        ConstantVelocity::new(model_parameters.drift),
+        XYMeasurementModel::new(
+            model_parameters.position_error,
+            model_parameters.position_error,
+        ),
     );
 
     track
@@ -148,6 +152,7 @@ fn initialize_kalman_track_xy(
 
 #[allow(dead_code)]
 fn initialize_kalman_track_measure_all(
+    model_parameters: ModelParameterConfig,
     measurement: (Cartesian2D, Velocity2D),
 ) -> KalmanTrack<4, 4, KinematicState, ConstantVelocity, MeasureAllModel<4>> {
     let (initial_position, initial_velocity) = measurement;
@@ -158,13 +163,21 @@ fn initialize_kalman_track_measure_all(
             initial_velocity.vx,
             initial_velocity.vy,
         ]),
-        SMatrix::from_diagonal(&Vector4::new(GPS_ERROR, GPS_ERROR, 0., 0.)),
+        SMatrix::from_diagonal(&Vector4::new(
+            model_parameters.position_error,
+            model_parameters.position_error,
+            0.,
+            0.,
+        )),
     );
     let track = KalmanTrack::new(
         initial_state,
-        ConstantVelocity::new(DRIFT),
+        ConstantVelocity::new(model_parameters.drift),
         MeasureAllModel::new(SVector::<f64, 4>::new(
-            GPS_ERROR, GPS_ERROR, VEL_ERROR, VEL_ERROR,
+            model_parameters.position_error,
+            model_parameters.position_error,
+            model_parameters.velocity_error,
+            model_parameters.velocity_error,
         )),
     );
 

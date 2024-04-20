@@ -1231,6 +1231,7 @@ dependencies = [
  "nmea",
  "regex",
  "reqwest",
+ "serde",
  "serialport",
  "spidev",
  "tokio",

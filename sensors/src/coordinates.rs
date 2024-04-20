@@ -36,6 +36,29 @@ impl GeoCoord {
     }
 }
 
+#[derive(Debug, Copy, Clone)]
+pub struct KinematicState {
+    position: Cartesian2D,
+    velocity: Velocity2D,
+}
+
+impl KinematicState {
+    pub fn new(position: Cartesian2D, velocity: Velocity2D) -> Self {
+        KinematicState { position, velocity }
+    }
+}
+
+impl Into<SVector<f64, 4>> for KinematicState {
+    fn into(self) -> SVector<f64, 4> {
+        SVector::<f64, 4>::new(
+            self.position.x,
+            self.position.y,
+            self.velocity.vx,
+            self.velocity.vy,
+        )
+    }
+}
+
 #[derive(Copy, Clone, Debug)]
 pub struct Velocity2D {
     pub vx: f64,

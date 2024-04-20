@@ -1,19 +1,22 @@
 use std::error::Error;
 use std::io;
 use std::io::{ErrorKind, Read, Write};
+
+use base64::Engine;
 use base64::engine::general_purpose::STANDARD;
 use bytes::Bytes;
+use futures::StreamExt;
 use nmea::ParseResult;
 use nmea::sentences::GgaData;
 use regex::Regex;
 use reqwest::{Client, RequestBuilder, Response};
 use reqwest::header::{AUTHORIZATION, HOST, USER_AGENT};
+use serde::{Deserialize, Serialize};
 use serialport::SerialPort;
 use tokio::runtime::Runtime;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::{Receiver, Sender};
-use base64::Engine;
-use futures::StreamExt;
+
 pub trait GPSSensor: Iterator<Item = GgaData> {}
 
 /// # Explanation
@@ -55,19 +58,18 @@ impl Iterator for UbloxSensor {
         let nmea_sentences = self
             .read_from_device()
             .map(|data| String::from_utf8_lossy(&data).to_string());
-        
+
         if let Ok(nmea_sentences) = nmea_sentences {
             log::trace!("Ublox data: {:?}", nmea_sentences);
-            extract_gga_sentence(&nmea_sentences).and_then(|gga_sentence| {
-                parse_to_gga(&gga_sentence)
-            })
+            extract_gga_sentence(&nmea_sentences)
+                .and_then(|gga_sentence| parse_to_gga(&gga_sentence))
         } else {
             None
         }
     }
 }
 
-#[derive(Debug)]
+#[derive(Serialize, Deserialize, Debug)]
 pub struct NtripClientSettings {
     pub addr: String,
     pub port: u16,
@@ -190,8 +192,6 @@ impl NtripClient {
     }
 }
 
-
-
 /// # Explanation
 /// This struct represents a ublox gps sensor that corrects the gps data with rtcm data (via ntrip).
 pub struct NtripUbloxSensor {
@@ -230,7 +230,6 @@ impl Iterator for NtripUbloxSensor {
         self.gps_sensor.next()
     }
 }
-
 
 /// # Explanation
 /// This function returns the nmea GGA sentence that is in the given string (if present).
