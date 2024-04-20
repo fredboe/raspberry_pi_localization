@@ -2,23 +2,24 @@ name: Rust
 
 on:
   push:
-    branches: [ "master" ]
+    branches: [ "master", "development" ]
   pull_request:
-    branches: [ "master" ]
+    branches: [ "master", "development" ]
 
 env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  build:
-
+  tests:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
-    - name: Install dependencies
-      run: sudo apt-get update && sudo apt-get install -y libudev-dev
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
-      run: cargo test --verbose
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: sudo apt-get update && sudo apt-get install -y libudev-dev
+      - name: Robot tests
+        run: cargo test --manifest-path=robot/Cargo.toml
+      - name: Sensor tests
+        run: cargo test --manifest-path=sensors/Cargo.toml
+      - name: Fusion tests
+        run: cargo test --manifest-path=sensor_fusion/Cargo.toml
