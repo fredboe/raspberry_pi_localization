@@ -12,14 +12,14 @@ use sensor_fusion::kalman::estimator::KalmanFilter;
 use sensor_fusion::kalman::model::{ConstantVelocity, MeasureAllModel};
 use sensor_fusion::state::{GaussianState, Measurement, Waypoint};
 use sensor_fusion::track::Track;
-use sensors::{SimplePositionSensor, SimpleVelocitySensor};
 use sensors::compass::BNO055;
 use sensors::coordinates::{Cartesian2D, KinematicState, Velocity2D};
 use sensors::distance_traveled::PAA5100;
 use sensors::gps::{NtripUbloxSensor, UbloxSensor};
 use sensors::motor::AdafruitDCStepperHat;
+use sensors::{SimplePositionSensor, SimpleVelocitySensor};
 
-use crate::actions::{Action, perform_action};
+use crate::actions::{perform_action, Action};
 use crate::config::{Config, ModelParameterConfig, SensorParameterConfig};
 use crate::deciders::{Decider, FollowJoystick};
 use crate::user_input::{UserInput, UserInputUnit};
@@ -91,11 +91,10 @@ fn run(
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");
-            track
-                .plot("track.png", |waypoint| {
-                    (waypoint.state.estimate[0], waypoint.state.estimate[1])
-                })
-                .unwrap_or(());
+
+            track.plot("track", |waypoint| {
+                (waypoint.state.estimate[0], waypoint.state.estimate[1])
+            });
 
             perform_action(Action::Idle, &mut motor_controller).unwrap_or(());
             break;

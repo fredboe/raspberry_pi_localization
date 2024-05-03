@@ -8,6 +8,6 @@ edition = "2021"
 [dependencies]
 chrono = "0.4"
 nalgebra = "0.32"
-plotters = "0.3"
 simplelog = "0.12"
 rand = "0.8"
+plotly = "0.8"

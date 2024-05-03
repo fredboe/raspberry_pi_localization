@@ -1,8 +1,5 @@
-use std::error::Error;
-
-use plotters::prelude::{
-    BitMapBackend, ChartBuilder, GREEN, IntoDrawingArea, IntoFont, LineSeries, WHITE,
-};
+use plotly::{Plot, Scatter};
+use plotly::common::Mode;
 
 use crate::state::Waypoint;
 
@@ -30,44 +27,24 @@ impl<const D: usize> Track<D> {
         self.waypoints.last().unwrap() // waypoints cannot be empty
     }
 
-    pub fn plot(
+    pub fn create_scatter(
         &self,
-        filename: &str,
+        name: &str,
         to_2d: impl Fn(&Waypoint<D>) -> (f64, f64),
-    ) -> Result<(), Box<dyn Error>> {
-        let root = BitMapBackend::new(filename, (1000, 1000)).into_drawing_area();
-        root.fill(&WHITE)?;
-
-        let points: Vec<(f64, f64)> = self
+    ) -> Box<Scatter<f64, f64>> {
+        let (xs, ys): (Vec<f64>, Vec<f64>) = self
             .waypoints
             .iter()
             .map(|waypoint| to_2d(waypoint))
-            .collect();
+            .unzip();
 
-        let (point_min, point_max) = points
-            .iter()
-            .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), (x, y)| {
-                (min.min(*x).min(*y), max.max(*x).max(*y))
-            });
+        Scatter::new(xs, ys).mode(Mode::Lines).name(name)
+    }
 
-        let mut chart = ChartBuilder::on(&root)
-            .caption("Track Plot", ("sans-serif", 40).into_font())
-            .margin(5)
-            .x_label_area_size(30)
-            .y_label_area_size(30)
-            .build_cartesian_2d(
-                point_min - 1.0..point_max + 1.0,
-                point_min - 1.0..point_max + 1.0,
-            )?;
-
-        chart.configure_mesh().draw()?;
-
-        // Draw the track
-        chart.draw_series(LineSeries::new(points, &GREEN))?;
-
-        root.present()?;
-
-        Ok(())
+    pub fn plot(&self, name: &str, to_2d: impl Fn(&Waypoint<D>) -> (f64, f64)) {
+        let mut plot = Plot::new();
+        plot.add_trace(self.create_scatter(name, to_2d));
+        plot.write_html(format!("{}.html", name));
     }
 }
 
