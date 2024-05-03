@@ -6,6 +6,7 @@ use plotters::prelude::{
 
 use crate::state::Waypoint;
 
+#[derive(Clone)]
 pub struct Track<const D: usize> {
     waypoints: Vec<Waypoint<D>>,
 }
@@ -15,6 +16,10 @@ impl<const D: usize> Track<D> {
         Self {
             waypoints: vec![initial_waypoint],
         }
+    }
+
+    pub fn len(&self) -> usize {
+        self.waypoints.len()
     }
 
     pub fn add_waypoint(&mut self, waypoint: Waypoint<D>) {
@@ -38,6 +43,7 @@ impl<const D: usize> Track<D> {
             .iter()
             .map(|waypoint| to_2d(waypoint))
             .collect();
+
         let (point_min, point_max) = points
             .iter()
             .fold((f64::INFINITY, f64::NEG_INFINITY), |(min, max), (x, y)| {
@@ -49,7 +55,10 @@ impl<const D: usize> Track<D> {
             .margin(5)
             .x_label_area_size(30)
             .y_label_area_size(30)
-            .build_cartesian_2d(point_min..point_max, point_min..point_max)?;
+            .build_cartesian_2d(
+                point_min - 1.0..point_max + 1.0,
+                point_min - 1.0..point_max + 1.0,
+            )?;
 
         chart.configure_mesh().draw()?;
 
@@ -59,5 +68,14 @@ impl<const D: usize> Track<D> {
         root.present()?;
 
         Ok(())
+    }
+}
+
+impl<const D: usize> IntoIterator for Track<D> {
+    type Item = Waypoint<D>;
+    type IntoIter = std::vec::IntoIter<Self::Item>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.waypoints.into_iter()
     }
 }

@@ -1,3 +1,4 @@
+use std::error::Error;
 use std::fmt::{Display, Formatter};
 
 use chrono::Duration;
@@ -23,6 +24,8 @@ impl Display for EstimationError {
         }
     }
 }
+
+impl Error for EstimationError {}
 
 pub trait Estimator<const MD: usize, const SD: usize> {
     fn estimate(

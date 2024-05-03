@@ -1,6 +1,7 @@
 use chrono::{DateTime, Utc};
 use nalgebra::{SMatrix, SVector};
 
+#[derive(Debug, Clone)]
 pub struct Waypoint<const D: usize> {
     pub timestamp: DateTime<Utc>,
     pub state: GaussianState<D>,
@@ -16,6 +17,7 @@ impl<const D: usize> Waypoint<D> {
     }
 }
 
+#[derive(Debug, Clone)]
 pub struct Measurement<const D: usize> {
     pub timestamp: DateTime<Utc>,
     pub vector: SVector<f64, D>,

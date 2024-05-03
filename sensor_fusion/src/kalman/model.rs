@@ -38,15 +38,14 @@ impl LinearTransitionModel<4> for ConstantVelocity {
     /// |     0  dt^3/2       0     dt^2 |<br>
     fn transition_error(&self, dt: Duration) -> SMatrix<f64, 4, 4> {
         let dt = dt.num_milliseconds() as f64 / 1000.0;
-
         let pow4 = dt.powi(4) / 4.;
         let pow3 = dt.powi(3) / 2.;
         let pow2 = dt.powi(2);
 
         self.drift
             * SMatrix::<f64, 4, 4>::new(
-            pow4, 0., pow3, 0., 0., pow4, 0., pow3, pow3, 0., pow2, 0., 0., pow3, 0., pow2,
-        )
+                pow4, 0., pow3, 0., 0., pow4, 0., pow3, pow3, 0., pow2, 0., 0., pow3, 0., pow2,
+            )
     }
 }
 
