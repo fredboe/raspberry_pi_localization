@@ -8,13 +8,13 @@ pub trait Estimator<const MD: usize, const SD: usize> {
 }
 
 impl<const SD: usize, const MD: usize, T> Estimator<MD, SD> for T
-    where
-        T: Predictor<SD> + Filter<MD, SD> + Sized,
+where
+    T: Predictor<SD> + Filter<MD, SD> + Sized,
 {
     fn estimate(&self, track: &Track<SD>, measurement: Measurement<MD>) -> GaussianState<SD> {
         let dt = measurement.timestamp - track.last().unwrap().timestamp;
         let prediction = self.predict(track, dt);
-        let filtered = self.filter(prediction, measurement.state);
+        let filtered = self.filter(prediction, measurement);
         filtered
     }
 }
@@ -27,6 +27,6 @@ pub trait Filter<const MD: usize, const SD: usize> {
     fn filter(
         &self,
         prediction: GaussianState<SD>,
-        measurement: GaussianState<MD>,
+        measurement: Measurement<MD>,
     ) -> GaussianState<SD>;
 }

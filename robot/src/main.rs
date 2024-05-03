@@ -2,14 +2,19 @@ use std::error::Error;
 use std::fs::File;
 use std::str::FromStr;
 
+use chrono::Utc;
 use csv::Writer;
 use gilrs::Button;
 use log::LevelFilter;
 use nalgebra::{SMatrix, SVector, Vector4};
 use simplelog::WriteLogger;
 
-use sensor_fusion::kalman::model::{ConstantVelocity, MeasureAllModel, XYMeasurementModel};
-use sensor_fusion::kalman::track::{GaussianState, KalmanTrack};
+use sensor_fusion::estimator::Estimator;
+use sensor_fusion::kalman::estimator::KalmanFilter;
+use sensor_fusion::kalman::model::{ConstantVelocity, MeasureAllModel};
+use sensor_fusion::state::{GaussianState, Measurement, Waypoint};
+use sensor_fusion::track;
+use sensor_fusion::track::Track;
 use sensors::{SimplePositionSensor, SimpleVelocitySensor};
 use sensors::compass::BNO055;
 use sensors::coordinates::{Cartesian2D, KinematicState, Velocity2D};
@@ -65,12 +70,8 @@ fn run(
 
     let mut sensors = initialize_sensors(sensor_parameters)?;
 
-    let initial_measurement = loop {
-        if let Some(measurement) = sensors.next() {
-            break measurement;
-        }
-    };
-    let mut track = initialize_kalman_track_measure_all(model_parameters, initial_measurement);
+    let initial_measurement = get_initial_measurement(&mut sensors);
+    let (kalman_filter, mut track) = initialize_kalman(model_parameters, initial_measurement);
 
     println!("The robot is now drivable.");
 
@@ -87,18 +88,21 @@ fn run(
                 position,
                 velocity
             );
-            track
-                .new_measurement(KinematicState::new(position, velocity))
-                .unwrap_or(());
+            let timestamp = Utc::now();
+            let measurement =
+                Measurement::new(timestamp, KinematicState::new(position, velocity).into());
+            let estimate = kalman_filter.estimate(&track, measurement);
+            track.push(Waypoint::new(timestamp, estimate));
         });
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");
-            track.plot_track::<0, 1, 0, 1>("track.png").unwrap_or(());
-            track.smooth().unwrap_or(());
-            track
-                .plot_track::<0, 1, 0, 1>("track_smoothed.png")
-                .unwrap_or(());
+            track::plot_track(
+                &track,
+                |waypoint| (waypoint.state.estimate[0], waypoint.state.estimate[1]),
+                "track.png",
+            )
+            .unwrap_or(());
 
             measurements_writer.flush()?;
             perform_action(Action::Idle, &mut motor_controller).unwrap_or(());
@@ -134,44 +138,24 @@ fn initialize_sensors(
     Ok(sensors)
 }
 
-#[allow(dead_code)]
-fn initialize_kalman_track_xy(
-    model_parameters: ModelParameterConfig,
-) -> KalmanTrack<4, 2, Cartesian2D, ConstantVelocity, XYMeasurementModel<4>> {
-    let initial_state = GaussianState::<4>::new(
-        SVector::zeros(),
-        SMatrix::from_diagonal(&Vector4::new(
-            model_parameters.position_error,
-            model_parameters.position_error,
-            0.,
-            0.,
-        )),
-    );
-    let track = KalmanTrack::new(
-        initial_state,
-        ConstantVelocity::new(model_parameters.drift),
-        XYMeasurementModel::new(
-            model_parameters.position_error,
-            model_parameters.position_error,
-        ),
-    );
-
-    track
+fn get_initial_measurement(sensors: &mut ParSampler<(Cartesian2D, Velocity2D)>) -> Measurement<4> {
+    let initial_measurement = loop {
+        if let Some((initial_position, initial_velocity)) = sensors.next() {
+            break Measurement::from_into(KinematicState::new(initial_position, initial_velocity));
+        }
+    };
+    initial_measurement
 }
 
-#[allow(dead_code)]
-fn initialize_kalman_track_measure_all(
+fn initialize_kalman(
     model_parameters: ModelParameterConfig,
-    measurement: (Cartesian2D, Velocity2D),
-) -> KalmanTrack<4, 4, KinematicState, ConstantVelocity, MeasureAllModel<4>> {
-    let (initial_position, initial_velocity) = measurement;
+    initial_measurement: Measurement<4>,
+) -> (
+    KalmanFilter<4, 4, ConstantVelocity, MeasureAllModel<4>>,
+    Track<4>,
+) {
     let initial_state = GaussianState::<4>::new(
-        SVector::<f64, 4>::from_column_slice(&[
-            initial_position.x,
-            initial_position.y,
-            initial_velocity.vx,
-            initial_velocity.vy,
-        ]),
+        initial_measurement.vector,
         SMatrix::from_diagonal(&Vector4::new(
             model_parameters.position_error,
             model_parameters.position_error,
@@ -179,8 +163,8 @@ fn initialize_kalman_track_measure_all(
             0.,
         )),
     );
-    let track = KalmanTrack::new(
-        initial_state,
+
+    let kalman_filter = KalmanFilter::new(
         ConstantVelocity::new(model_parameters.drift),
         MeasureAllModel::new(SVector::<f64, 4>::new(
             model_parameters.position_error,
@@ -189,6 +173,7 @@ fn initialize_kalman_track_measure_all(
             model_parameters.velocity_error,
         )),
     );
+    let track = vec![Waypoint::from_state(initial_state)];
 
-    track
+    (kalman_filter, track)
 }

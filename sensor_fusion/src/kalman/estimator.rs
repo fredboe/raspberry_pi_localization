@@ -2,7 +2,7 @@ use chrono::Duration;
 
 use crate::estimator::{Filter, Predictor};
 use crate::model::{LinearMeasurementModel, LinearTransitionModel};
-use crate::state::GaussianState;
+use crate::state::{GaussianState, Measurement};
 use crate::track::Track;
 
 pub struct KalmanFilter<const MD: usize, const SD: usize, TModel, MModel> {
@@ -11,9 +11,9 @@ pub struct KalmanFilter<const MD: usize, const SD: usize, TModel, MModel> {
 }
 
 impl<const MD: usize, const SD: usize, TModel, MModel> KalmanFilter<MD, SD, TModel, MModel>
-    where
-        TModel: LinearTransitionModel<SD>,
-        MModel: LinearMeasurementModel<MD, SD>,
+where
+    TModel: LinearTransitionModel<SD>,
+    MModel: LinearMeasurementModel<MD, SD>,
 {
     pub fn new(transition_model: TModel, measurement_model: MModel) -> Self {
         Self {
@@ -24,10 +24,10 @@ impl<const MD: usize, const SD: usize, TModel, MModel> KalmanFilter<MD, SD, TMod
 }
 
 impl<const MD: usize, const SD: usize, TModel, MModel> Predictor<SD>
-for KalmanFilter<MD, SD, TModel, MModel>
-    where
-        TModel: LinearTransitionModel<SD>,
-        MModel: LinearMeasurementModel<MD, SD>,
+    for KalmanFilter<MD, SD, TModel, MModel>
+where
+    TModel: LinearTransitionModel<SD>,
+    MModel: LinearMeasurementModel<MD, SD>,
 {
     fn predict(&self, track: &Track<SD>, dt: Duration) -> GaussianState<SD> {
         let prior = track.last().unwrap().state.clone();
@@ -42,20 +42,20 @@ for KalmanFilter<MD, SD, TModel, MModel>
 }
 
 impl<const MD: usize, const SD: usize, TModel, MModel> Filter<MD, SD>
-for KalmanFilter<MD, SD, TModel, MModel>
-    where
-        TModel: LinearTransitionModel<SD>,
-        MModel: LinearMeasurementModel<MD, SD>,
+    for KalmanFilter<MD, SD, TModel, MModel>
+where
+    TModel: LinearTransitionModel<SD>,
+    MModel: LinearMeasurementModel<MD, SD>,
 {
     fn filter(
         &self,
         prediction: GaussianState<SD>,
-        measurement: GaussianState<MD>,
+        measurement: Measurement<MD>,
     ) -> GaussianState<SD> {
         let measurement_matrix = self.measurement_model.measurement_matrix();
         let measurement_error = self.measurement_model.measurement_error();
 
-        let innovation = measurement.estimate - measurement_matrix * prediction.estimate;
+        let innovation = measurement.vector - measurement_matrix * prediction.estimate;
         let innovation_error =
             measurement_matrix * prediction.error * measurement_matrix.transpose()
                 + measurement_error;

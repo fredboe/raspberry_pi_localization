@@ -1,6 +1,6 @@
 use std::io;
 use std::io::ErrorKind;
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize};
 use spidev::{Spidev, SpidevOptions, SpidevTransfer, SpiModeFlags};
