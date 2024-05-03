@@ -1,9 +1,7 @@
 use std::error::Error;
-use std::fs::File;
 use std::str::FromStr;
 
 use chrono::Utc;
-use csv::Writer;
 use gilrs::Button;
 use log::LevelFilter;
 use nalgebra::{SMatrix, SVector, Vector4};
@@ -13,7 +11,6 @@ use sensor_fusion::estimator::Estimator;
 use sensor_fusion::kalman::estimator::KalmanFilter;
 use sensor_fusion::kalman::model::{ConstantVelocity, MeasureAllModel};
 use sensor_fusion::state::{GaussianState, Measurement, Waypoint};
-use sensor_fusion::track;
 use sensor_fusion::track::Track;
 use sensors::{SimplePositionSensor, SimpleVelocitySensor};
 use sensors::compass::BNO055;
@@ -62,8 +59,6 @@ fn run(
     sensor_parameters: SensorParameterConfig,
     model_parameters: ModelParameterConfig,
 ) -> Result<(), Box<dyn Error>> {
-    let mut measurements_writer = Writer::from_writer(File::create("measurements.csv")?);
-
     let mut motor_controller = AdafruitDCStepperHat::new(0x60)?;
     let mut user_input_unit = UserInputUnit::new()?;
     let mut follow_joystick = FollowJoystick::new();
@@ -79,32 +74,29 @@ fn run(
         let user_input = user_input_unit.next().unwrap_or(UserInput::default());
 
         sensors.next().map(|(position, velocity)| {
-            measurements_writer
-                .serialize((position, velocity))
-                .unwrap_or(()); // + timestamp
-
             log::info!(
                 "The robot is at {:?} with a velocity of {:?}.",
                 position,
                 velocity
             );
+
             let timestamp = Utc::now();
             let measurement =
                 Measurement::new(timestamp, KinematicState::new(position, velocity).into());
             let estimate = kalman_filter.estimate(&track, measurement);
-            track.push(Waypoint::new(timestamp, estimate));
+            if let Ok(estimate) = estimate {
+                track.add_waypoint(Waypoint::new(timestamp, estimate));
+            }
         });
 
         if user_input.is_pressed(Button::East) {
             log::info!("Plotting the track.");
-            track::plot_track(
-                &track,
-                |waypoint| (waypoint.state.estimate[0], waypoint.state.estimate[1]),
-                "track.png",
-            )
-            .unwrap_or(());
+            track
+                .plot("track.png", |waypoint| {
+                    (waypoint.state.estimate[0], waypoint.state.estimate[1])
+                })
+                .unwrap_or(());
 
-            measurements_writer.flush()?;
             perform_action(Action::Idle, &mut motor_controller).unwrap_or(());
             break;
         }
@@ -173,7 +165,7 @@ fn initialize_kalman(
             model_parameters.velocity_error,
         )),
     );
-    let track = vec![Waypoint::from_state(initial_state)];
+    let track = Track::new(Waypoint::from_state(initial_state));
 
     (kalman_filter, track)
 }
