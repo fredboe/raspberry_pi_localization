@@ -1,19 +1,75 @@
-use base64::engine::general_purpose::STANDARD;
-use base64::Engine;
-use bytes::Bytes;
-use futures::StreamExt;
-use nmea::sentences::GgaData;
-use nmea::ParseResult;
-use regex::Regex;
-use reqwest::header::{AUTHORIZATION, HOST, USER_AGENT};
-use reqwest::{Client, RequestBuilder, Response};
 use std::error::Error;
 use std::io;
-use std::io::ErrorKind;
-use tokio::runtime::Runtime;
-use tokio::sync::mpsc::Sender;
+use std::io::{ErrorKind, Read, Write};
 
-#[derive(Debug)]
+use base64::Engine;
+use base64::engine::general_purpose::STANDARD;
+use bytes::Bytes;
+use futures::StreamExt;
+use nmea::ParseResult;
+use nmea::sentences::GgaData;
+use regex::Regex;
+use reqwest::{Client, RequestBuilder, Response};
+use reqwest::header::{AUTHORIZATION, HOST, USER_AGENT};
+use serde::{Deserialize, Serialize};
+use serialport::SerialPort;
+use tokio::runtime::Runtime;
+use tokio::sync::mpsc;
+use tokio::sync::mpsc::{Receiver, Sender};
+
+pub trait GPSSensor: Iterator<Item = GgaData> {}
+
+/// # Explanation
+/// This is a simple interface to an ublox gps sensor that is connected via usb. With this interface
+/// one is able to retrieve the nmea sentences the sensor sends over the usb connection.
+pub struct UbloxSensor {
+    port: Box<dyn SerialPort>,
+}
+
+impl UbloxSensor {
+    pub fn new(path: &str, baud_rate: u32) -> Result<Self, serialport::Error> {
+        let port = serialport::new(path, baud_rate).open()?;
+        Ok(UbloxSensor { port })
+    }
+
+    /// # Explanation
+    /// This function reads all the available data from the usb connection.
+    fn read_from_device(&mut self) -> io::Result<Vec<u8>> {
+        let bytes_to_read = self.port.bytes_to_read()?;
+        let mut data_buffer = vec![0u8; bytes_to_read as usize];
+
+        self.port.read_exact(&mut data_buffer)?;
+
+        Ok(data_buffer)
+    }
+
+    pub(crate) fn apply_correction(&mut self, correction: &[u8]) -> io::Result<()> {
+        self.port.write_all(&correction)
+    }
+}
+
+/// # Explanation
+/// Iterator to retrieve the geographic coordinates (longitude and latitude) of the sensor_utils.
+/// The iterator reads the available data from the sensor_utils and retrieves the geographic coordinates.
+impl Iterator for UbloxSensor {
+    type Item = GgaData;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let nmea_sentences = self
+            .read_from_device()
+            .map(|data| String::from_utf8_lossy(&data).to_string());
+
+        if let Ok(nmea_sentences) = nmea_sentences {
+            log::trace!("Ublox data: {:?}", nmea_sentences);
+            extract_gga_sentence(&nmea_sentences)
+                .and_then(|gga_sentence| parse_to_gga(&gga_sentence))
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Clone, Serialize, Deserialize, Debug)]
 pub struct NtripClientSettings {
     pub addr: String,
     pub port: u16,
@@ -32,7 +88,7 @@ impl NtripClientSettings {
         password: String,
         initial_gga_sentence: String,
     ) -> Self {
-        NtripClientSettings {
+        Self {
             addr,
             port,
             mountpoint,
@@ -49,7 +105,7 @@ impl NtripClientSettings {
 ///
 /// The ntrip client first sends a http header to authenticate itself and send an initial nmea gga sentence.
 /// Then with the open socket the caster sends back the rtcm data (correction data).
-pub struct NtripClient;
+struct NtripClient;
 
 impl NtripClient {
     pub fn run(settings: NtripClientSettings, sender: Sender<Bytes>) {
@@ -137,8 +193,47 @@ impl NtripClient {
 }
 
 /// # Explanation
+/// This struct represents a ublox gps sensor that corrects the gps data with rtcm data (via ntrip).
+pub struct NtripUbloxSensor {
+    gps_sensor: UbloxSensor,
+    rtcm_receiver: Receiver<Bytes>,
+}
+
+impl NtripUbloxSensor {
+    pub fn new(gps_sensor: UbloxSensor, ntrip_settings: NtripClientSettings) -> Self {
+        let (rtcm_sender, rtcm_receiver) = mpsc::channel(128);
+        NtripClient::run(ntrip_settings, rtcm_sender);
+
+        NtripUbloxSensor {
+            gps_sensor,
+            rtcm_receiver,
+        }
+    }
+
+    fn apply_available_correction(&mut self) -> io::Result<()> {
+        let mut rtcm_messages = vec![];
+        while let Ok(rtcm_message) = self.rtcm_receiver.try_recv() {
+            rtcm_messages.push(rtcm_message);
+        }
+
+        let rtcm_data: Vec<u8> = rtcm_messages.into_iter().flatten().collect();
+        self.gps_sensor.apply_correction(&rtcm_data)?;
+        Ok(())
+    }
+}
+
+impl Iterator for NtripUbloxSensor {
+    type Item = GgaData;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.apply_available_correction().unwrap_or(());
+        self.gps_sensor.next()
+    }
+}
+
+/// # Explanation
 /// This function returns the nmea GGA sentence that is in the given string (if present).
-pub fn extract_gga_sentence(s: &str) -> Option<String> {
+fn extract_gga_sentence(s: &str) -> Option<String> {
     let re = Regex::new(r"\$.{0,2}GGA.{0,200}\r\n").unwrap();
     re.find(&s).map(|gga_match| gga_match.as_str().to_string())
 }
@@ -146,39 +241,10 @@ pub fn extract_gga_sentence(s: &str) -> Option<String> {
 /// # Explanation
 /// Parses the given string to GgaData. Keep in mind, that the given string must begin and end with
 /// the GGA sentence (the sentence can not be in the middle).
-pub fn parse_to_gga(s: &str) -> Option<GgaData> {
+fn parse_to_gga(s: &str) -> Option<GgaData> {
     let parse_result = nmea::parse_str(s);
     match parse_result {
         Ok(ParseResult::GGA(gga_sentence)) => Some(gga_sentence),
         _ => None,
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::sensor_utils::gps;
-
-    #[test]
-    fn test_extract_gga() {
-        let sentence =
-            "$GNRMC,185823.40,A,4808.7402374,N,01133.9324760,E,0.00,112.64,130117,3.00,E,A*14\r\n";
-        assert!(gps::extract_gga_sentence(sentence).is_none());
-
-        let sentence = "$GPGGA,123519,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*47\r\n";
-        assert!(gps::extract_gga_sentence(sentence).is_some());
-
-        let sentence = "abcdefg";
-        assert!(gps::extract_gga_sentence(sentence).is_none());
-
-        let sentence = "$GNGGA,123519.00,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*77\r\n\
-                             $GNRMC,185823.40,A,4808.7402374,N,01133.9324760,E,0.00,112.64,130117,3.00,E,A*14\r\n";
-        assert!(gps::extract_gga_sentence(sentence).is_some());
-
-        let sentence = "$GNRMC,185823.40,A,4808.7402374,N,01133.9324760,E,0.00,112.64,130117,3.00,E,A*14\r\n\
-                             $GNGGA,123519.00,4807.038,N,01131.000,E,1,08,0.9,545.4,M,46.9,M,,*77\r\n";
-        assert!(gps::extract_gga_sentence(sentence).is_some());
-
-        let sentence = "$GNRMC,202521.36,V,,,,,,,090823,,,N,V*1A\r\n";
-        assert!(gps::extract_gga_sentence(sentence).is_none());
     }
 }

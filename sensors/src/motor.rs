@@ -1,6 +1,43 @@
-use crate::actions::{Directions, MotorController};
+use std::error::Error;
+
 use i2cdev::core::*;
 use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
+use serde::{Deserialize, Serialize};
+
+/// # Explanation
+/// The MotorController trait is a trait that can be used to implement a struct that (like the name says)
+/// controls a robot.
+pub trait MotorController<ERR: Error> {
+    fn set_speed(&mut self, motor_id: u8, speed: f32) -> Result<(), ERR>;
+
+    fn set_direction(&mut self, motor_id: u8, direction: Directions) -> Result<(), ERR>;
+
+    fn run(&mut self, motor_id: u8, direction: Directions, speed: f32) -> Result<(), ERR> {
+        self.set_direction(motor_id, direction)?;
+        self.set_speed(motor_id, speed)
+    }
+}
+
+/// # Explanation
+/// The directions enum consists of all the modes a motor can have (FORWARD, BACKWARD and BREAK).
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Serialize, Deserialize)]
+pub enum Directions {
+    FORWARD,
+    BACKWARD,
+    BREAK,
+}
+
+impl From<f32> for Directions {
+    /// # Explanation
+    /// If value >= 0 then FORWARD else BACKWARD
+    fn from(value: f32) -> Self {
+        if value >= 0.0 {
+            Directions::FORWARD
+        } else {
+            Directions::BACKWARD
+        }
+    }
+}
 
 /// # Explanation
 /// This is a simple implementation to work with the Adafruit DC & Stepper Motor HAT for Raspberry Pi.
@@ -19,7 +56,7 @@ impl AdafruitDCStepperHat {
     pub fn new(i2c_addr: u16) -> Result<Self, LinuxI2CError> {
         let mut i2c_device = LinuxI2CDevice::new("/dev/i2c-1", i2c_addr)?;
         i2c_device.write(&[0x00, 0x00])?;
-        Ok(AdafruitDCStepperHat { i2c_device })
+        Ok(Self { i2c_device })
     }
 
     /// # Explanation

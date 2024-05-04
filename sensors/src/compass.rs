@@ -1,21 +1,35 @@
-use crate::sensor_utils::velocity::Orientation;
-use i2cdev::core::I2CDevice;
-use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
 use std::io;
 use std::io::ErrorKind;
+
+use i2cdev::core::I2CDevice;
+use i2cdev::linux::{LinuxI2CDevice, LinuxI2CError};
+use serde::{Deserialize, Serialize};
+
+pub trait Compass: Iterator<Item = Orientation> {}
+
+#[derive(Copy, Clone, Debug, Serialize, Deserialize)]
+pub struct Orientation {
+    pub radian: f64,
+}
+
+impl Orientation {
+    pub fn new(radian: f64) -> Self {
+        Self { radian }
+    }
+}
 
 /// # Explanation
 /// This is a simple implementation to interact with the BNO055 sensor_utils.
 /// With it one can get the linear acceleration, the orientation and then the two combined as the
 /// acceleration in global frame (east represents the x-axis and north the y-axis).
-pub struct BNO055Compass {
+pub struct BNO055 {
     i2c_device: LinuxI2CDevice,
 }
 
-impl BNO055Compass {
+impl BNO055 {
     pub fn new(i2c_addr: u16) -> Result<Self, LinuxI2CError> {
         let i2c_device = LinuxI2CDevice::new("/dev/i2c-1", i2c_addr)?;
-        let mut bno055 = BNO055Compass { i2c_device };
+        let mut bno055 = Self { i2c_device };
 
         if bno055.read_one_reg(0x00)? != 0xA0 {
             Err(LinuxI2CError::Io(io::Error::new(
@@ -52,7 +66,7 @@ impl BNO055Compass {
         self.write_one_reg(0x3D, 0x09)
     }
 
-    pub fn read_heading(&mut self) -> Result<Orientation, LinuxI2CError> {
+    fn read_heading(&mut self) -> Result<Orientation, LinuxI2CError> {
         const QUANTIZATION: f64 = 900.0;
 
         let mut heading_buffer = [0u8; 2];
@@ -86,7 +100,7 @@ impl BNO055Compass {
     }
 }
 
-impl Iterator for BNO055Compass {
+impl Iterator for BNO055 {
     type Item = Orientation;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -95,3 +109,5 @@ impl Iterator for BNO055Compass {
         heading.ok()
     }
 }
+
+impl Compass for BNO055 {}
